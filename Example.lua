@@ -1,4 +1,5 @@
-local MacLib = loadstring(game:HttpGet("https://github.com/biggaboy212/Maclib/releases/latest/download/maclib.txt"))()
+-- ?t=<time> busts raw.githubusercontent.com's ~5 min CDN cache so you always get the latest push
+local MacLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/n0namevnnek-web/MacSlop/refs/heads/main/maclib.lua?t=" .. tostring(os.time())))()
 
 local Window = MacLib:Window({
 	Title = "Maclib Demo",
@@ -69,6 +70,7 @@ sections.MainSection1:Header({
 
 sections.MainSection1:Button({
 	Name = "Button",
+	Tooltip = "Opens a confirmation dialog", -- hover this control to see the tooltip
 	Callback = function()
 		Window:Dialog({
 			Title = Window.Settings.Title,
@@ -115,16 +117,99 @@ sections.MainSection1:Slider({
 	end
 }, "Slider")
 
+sections.MainSection1:Slider({
+	Name = "Slider with a longer descriptive name",
+	Default = 25,
+	Minimum = 0,
+	Maximum = 100,
+	DisplayMethod = "Percent",
+	Precision = 0,
+	Callback = function(Value)
+		print("Changed to ".. Value)
+	end
+}, "LongNameSlider")
+
 sections.MainSection1:Toggle({
 	Name = "Toggle",
 	Default = false,
+	Tooltip = "Toggle the demo feature on or off", -- hover the row to see the tooltip
 	Callback = function(value)
 		Window:Notify({
 			Title = Window.Settings.Title,
 			Description = (value and "Enabled " or "Disabled ") .. "Toggle"
 		})
 	end,
+	Submenu = function(sub)
+		sub:Dropdown({
+			Name = "Submenu Option",
+			Options = { "Option A", "Option B", "Option C" },
+			Default = 1,
+			Callback = function(value)
+				print("Submenu selected:", value)
+			end,
+		})
+		sub:Slider({
+			Name = "Intensity",
+			Default = 50,
+			Minimum = 0,
+			Maximum = 100,
+			DisplayMethod = "Percent",
+			Precision = 0,
+			Callback = function(value)
+				print("Submenu intensity:", value)
+			end,
+		})
+		sub:Input({
+			Name = "Label",
+			Placeholder = "Type here...",
+			AcceptedCharacters = "All",
+			Callback = function(text)
+				print("Submenu input:", text)
+			end,
+		})
+	end,
 }, "Toggle")
+
+sections.MainSection1:Toggle({
+	Name = "Auto Normalize Shiny",
+	Default = false,
+	Callback = function(value)
+		Window:Notify({
+			Title = Window.Settings.Title,
+			Description = (value and "Enabled " or "Disabled ") .. "Auto Normalize"
+		})
+	end,
+	SideMenuSide = "Left", -- which window edge the drawer slides out of: "Left" or "Right" (default "Left")
+	SideMenu = function(side)
+		side:Dropdown({
+			Name = "Target Ball",
+			Options = { "Poke Ball", "Great Ball", "Ultra Ball" },
+			Default = 1,
+			Callback = function(value)
+				print("SideMenu ball:", value)
+			end,
+		})
+		side:Slider({
+			Name = "Threshold",
+			Default = 75,
+			Minimum = 0,
+			Maximum = 100,
+			DisplayMethod = "Percent",
+			Precision = 0,
+			Callback = function(value)
+				print("SideMenu threshold:", value)
+			end,
+		})
+		side:Input({
+			Name = "Webhook",
+			Placeholder = "https://...",
+			AcceptedCharacters = "All",
+			Callback = function(text)
+				print("SideMenu webhook:", text)
+			end,
+		})
+	end,
+}, "AutoNormalizeShiny")
 
 sections.MainSection1:Keybind({
 	Name = "Keybind",
@@ -152,6 +237,14 @@ sections.MainSection1:Colorpicker({
 		print("Color: ", color)
 	end,
 }, "Colorpicker")
+
+sections.MainSection1:Colorpicker({
+	Name = "Accent Color",
+	Default = Window:GetAccent(),
+	Callback = function(color)
+		Window:SetAccent(color)
+	end,
+}, "AccentColor")
 
 local alphaColorPicker = sections.MainSection1:Colorpicker({
 	Name = "Transparency Colorpicker",
@@ -199,6 +292,7 @@ local optionTable = {
 
 local Dropdown = sections.MainSection1:Dropdown({
 	Name = "Dropdown",
+	Search = true,
 	Multi = false,
 	Required = true,
 	Options = optionTable,
