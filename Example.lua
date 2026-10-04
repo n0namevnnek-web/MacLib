@@ -1,5 +1,5 @@
 -- ?t=<time> busts raw.githubusercontent.com's ~5 min CDN cache so you always get the latest push
-local MacLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/n0namevnnek-web/MacSlop/refs/heads/main/maclib.lua?t=" .. tostring(os.time())))()
+local MacLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/n0namevnnek-web/MacLib/refs/heads/main/maclib.lua?t=" .. tostring(os.time())))()
 
 local Window = MacLib:Window({
 	Title = "Maclib Demo",
