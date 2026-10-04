@@ -6256,4 +6256,602 @@ function MacLib:Demo()
 	tabs.Main:Select()
 end
 
+--// WindUI + Fluent compatibility layer
+-- Drop-in goal:
+--   local Library = loadstring(game:HttpGet(".../maclib.lua"))()
+--   local Window = Library:CreateWindow({...}) -- WindUI/Fluent style
+--   local Tab = Window:Tab({...}) or Window:AddTab({...})
+--   local Section = Tab:Section({...}) or Tab:AddSection({...})
+-- Existing native MacLib calls still work.
+do
+	MacLib.Options = MacLib.Options or {}
+	MacLib.Flags = MacLib.Flags or MacLib.Options
+
+	local function first(...)
+		for i = 1, select("#", ...) do
+			local value = select(i, ...)
+			if value ~= nil then
+				return value
+			end
+		end
+		return nil
+	end
+
+	local function toName(opts, fallback)
+		opts = opts or {}
+		return tostring(first(opts.Name, opts.Title, opts.Text, opts.Label, fallback or "Item"))
+	end
+
+	local function toDescription(opts)
+		opts = opts or {}
+		return tostring(first(opts.Description, opts.Desc, opts.Body, opts.Content, ""))
+	end
+
+	local function toCallback(opts)
+		opts = opts or {}
+		return first(opts.Callback, opts.callback, opts.OnChanged, opts.onChanged, opts.OnChange, opts.onChange)
+	end
+
+	local function normalizeOptions(options)
+		local output = {}
+		if type(options) ~= "table" then
+			return output
+		end
+		for _, option in ipairs(options) do
+			if type(option) == "table" then
+				table.insert(output, tostring(first(option.Value, option.Name, option.Title, option.Text, option[1], "")))
+			else
+				table.insert(output, tostring(option))
+			end
+		end
+		return output
+	end
+
+	local function normalizeDefault(default, options, multi)
+		if multi then
+			return type(default) == "table" and default or {}
+		end
+		if type(default) == "table" then
+			default = first(default.Value, default.Name, default.Title, default.Text, default[1])
+		end
+		if type(default) == "string" and type(options) == "table" then
+			for i, option in ipairs(options) do
+				if option == default then
+					return i
+				end
+			end
+		end
+		return default
+	end
+
+	local function hasEntries(tbl)
+		return type(tbl) == "table" and next(tbl) ~= nil
+	end
+
+	local function mergeIdOptions(idOrOptions, options)
+		if type(idOrOptions) == "table" then
+			return first(idOrOptions.Id, idOrOptions.Flag), idOrOptions
+		end
+		options = options or {}
+		if type(idOrOptions) == "string" then
+			if hasEntries(options) then
+				options.Id = first(options.Id, options.Flag, idOrOptions)
+				options.Title = first(options.Title, options.Name, options.Text, idOrOptions)
+			else
+				options.Title = first(options.Title, options.Name, idOrOptions)
+			end
+		end
+		return first(options.Id, options.Flag), options
+	end
+
+	local function registerOption(id, control)
+		if id and type(control) == "table" then
+			MacLib.Options = MacLib.Options or {}
+			control.Id = id
+			MacLib.Options[id] = control
+		end
+		return control
+	end
+
+	local function callbackProxy(userCallback, controlRef)
+		return function(value)
+			local control = controlRef and controlRef()
+			if type(control) == "table" then
+				control.Value = value
+			end
+			if userCallback then
+				userCallback(value)
+			end
+			if type(control) == "table" and control.Changed then
+				control.Changed(value)
+			end
+		end
+	end
+
+	local function patchControl(control, kind)
+		if type(control) ~= "table" or control.__MacCompatPatched then
+			return control
+		end
+		control.__MacCompatPatched = true
+		control.Type = control.Type or kind
+
+		local function currentValue(self)
+			if self.Value ~= nil then return self.Value end
+			if self.State ~= nil then return self.State end
+			if self.Text ~= nil then return self.Text end
+			if self.GetState then return self:GetState() end
+			if self.GetValue then return self:GetValue() end
+			if self.GetInput then return self:GetInput() end
+			return nil
+		end
+
+		control.OnChanged = control.OnChanged or function(self, callback)
+			self.Changed = callback
+			if callback then
+				task.spawn(callback, currentValue(self))
+			end
+			return self
+		end
+		control._MacCompatFireChanged = control._MacCompatFireChanged or function(self, value)
+			self.Value = value
+			if self.Changed then
+				task.spawn(self.Changed, value)
+			end
+		end
+		control.Destroy = control.Destroy or function(self)
+			if self.SetVisibility then
+				self:SetVisibility(false)
+			end
+			if self.Id and MacLib.Options then
+				MacLib.Options[self.Id] = nil
+			end
+		end
+
+		if control.UpdateName then
+			control.SetTitle = control.SetTitle or function(self, value) return self:UpdateName(value) end
+			control.SetText = control.SetText or function(self, value) return self:UpdateName(value) end
+		end
+		if control.SetVisibility then
+			control.SetVisible = control.SetVisible or function(self, value) return self:SetVisibility(value) end
+			control.Visible = control.Visible or function(self, value) return self:SetVisibility(value) end
+		end
+		if control.UpdateState then
+			control.Set = control.Set or function(self, value) self:UpdateState(value); self.Value = self.GetState and self:GetState() or value; return self end
+			control.SetValue = control.SetValue or function(self, value) return self:Set(value) end
+			control.SetState = control.SetState or function(self, value) return self:Set(value) end
+		end
+		if control.GetState then
+			control.Get = control.Get or function(self) return self:GetState() end
+			control.GetValue = control.GetValue or function(self) return self:GetState() end
+		end
+		if control.UpdateValue then
+			control.Set = control.Set or function(self, value) self:UpdateValue(value); self.Value = self.GetValue and self:GetValue() or value; return self end
+			control.SetValue = control.SetValue or function(self, value) return self:Set(value) end
+		end
+		if control.GetValue then
+			control.Get = control.Get or function(self) return self:GetValue() end
+		end
+		if control.UpdateText then
+			control.Set = control.Set or function(self, value) self:UpdateText(value); self.Value = self.GetInput and self:GetInput() or value; return self end
+			control.SetValue = control.SetValue or function(self, value) return self:Set(value) end
+			control.SetText = control.SetText or function(self, value) return self:Set(value) end
+		end
+		if control.GetInput then
+			control.Get = control.Get or function(self) return self:GetInput() end
+			control.GetValue = control.GetValue or function(self) return self:GetInput() end
+		end
+		if control.UpdateSelection then
+			control.Set = control.Set or function(self, value) self:UpdateSelection(value); self.Value = value; return self end
+			control.SetValue = control.SetValue or function(self, value) return self:Set(value) end
+			control.Select = control.Select or function(self, value) return self:Set(value) end
+			control.SetValues = control.SetValues or function(self, values)
+				if self.ClearOptions then self:ClearOptions() end
+				if self.InsertOptions then self:InsertOptions(normalizeOptions(values)) end
+				return self
+			end
+		end
+		if control.UpdateHeader then
+			control.SetTitle = control.SetTitle or function(self, value) return self:UpdateHeader(value) end
+			control.SetText = control.SetText or function(self, value) return self:UpdateHeader(value) end
+		end
+		if control.UpdateBody then
+			control.SetDesc = control.SetDesc or function(self, value) return self:UpdateBody(value) end
+			control.SetDescription = control.SetDescription or function(self, value) return self:UpdateBody(value) end
+			control.SetBody = control.SetBody or function(self, value) return self:UpdateBody(value) end
+		end
+		return control
+	end
+
+	local function patchSection(section)
+		if type(section) ~= "table" or section.__MacCompatSection then
+			return section
+		end
+		section.__MacCompatSection = true
+
+		local nativeButton = section.Button
+		function section:Button(opts)
+			opts = opts or {}
+			local id = first(opts.Id, opts.Flag)
+			local control
+			control = patchControl(nativeButton(self, {
+				Name = toName(opts, "Button"),
+				Tooltip = opts.Tooltip,
+				Callback = toCallback(opts),
+			}), "Button")
+			return registerOption(id, control)
+		end
+		section.AddButton = section.AddButton or function(self, title, opts)
+			local _, merged = mergeIdOptions(title, opts)
+			opts = merged
+			return self:Button(opts)
+		end
+
+		local nativeToggle = section.Toggle
+		function section:Toggle(opts)
+			opts = opts or {}
+			local id = first(opts.Id, opts.Flag)
+			local control
+			local userCallback = toCallback(opts)
+			control = patchControl(nativeToggle(self, {
+				Name = toName(opts, "Toggle"),
+				Default = first(opts.Default, opts.Value, false),
+				Tooltip = opts.Tooltip,
+				Submenu = opts.Submenu,
+				SideMenu = opts.SideMenu,
+				Callback = callbackProxy(userCallback, function() return control end),
+			}), "Toggle")
+			control.Value = control.GetState and control:GetState() or first(opts.Default, opts.Value, false)
+			return registerOption(id, control)
+		end
+		section.AddToggle = section.AddToggle or function(self, title, opts)
+			local _, merged = mergeIdOptions(title, opts)
+			opts = merged
+			return self:Toggle(opts)
+		end
+
+		local nativeSlider = section.Slider
+		function section:Slider(opts)
+			opts = opts or {}
+			local id = first(opts.Id, opts.Flag)
+			local value = opts.Value
+			local min = first(opts.Minimum, opts.Min, opts.MinValue, type(value) == "table" and value.Min, 0)
+			local max = first(opts.Maximum, opts.Max, opts.MaxValue, type(value) == "table" and value.Max, 100)
+			local default = first(opts.Default, type(value) == "table" and value.Default, opts.CurrentValue, min)
+			local control
+			local userCallback = toCallback(opts)
+			control = patchControl(nativeSlider(self, {
+				Name = toName(opts, "Slider"),
+				Minimum = tonumber(min) or 0,
+				Maximum = tonumber(max) or 100,
+				Default = tonumber(default) or tonumber(min) or 0,
+				DisplayMethod = opts.DisplayMethod or "Value",
+				Callback = callbackProxy(userCallback, function() return control end),
+			}), "Slider")
+			control.Value = control.GetValue and control:GetValue() or tonumber(default) or tonumber(min) or 0
+			return registerOption(id, control)
+		end
+		section.AddSlider = section.AddSlider or function(self, title, opts)
+			local _, merged = mergeIdOptions(title, opts)
+			opts = merged
+			return self:Slider(opts)
+		end
+
+		local nativeInput = section.Input
+		function section:Input(opts)
+			opts = opts or {}
+			local id = first(opts.Id, opts.Flag)
+			local control
+			local callback = toCallback(opts)
+			control = patchControl(nativeInput(self, {
+				Name = toName(opts, "Input"),
+				Default = tostring(first(opts.Default, opts.Value, opts.Text, "")),
+				Placeholder = tostring(first(opts.Placeholder, opts.PlaceholderText, "")),
+				AcceptedCharacters = opts.AcceptedCharacters,
+				Callback = callbackProxy(callback, function() return control end),
+				onChanged = callbackProxy(callback, function() return control end),
+			}), "Input")
+			control.Value = control.GetInput and control:GetInput() or tostring(first(opts.Default, opts.Value, opts.Text, ""))
+			return registerOption(id, control)
+		end
+		section.AddInput = section.AddInput or function(self, title, opts)
+			local _, merged = mergeIdOptions(title, opts)
+			opts = merged
+			return self:Input(opts)
+		end
+
+		local nativeDropdown = section.Dropdown
+		function section:Dropdown(opts)
+			opts = opts or {}
+			local id = first(opts.Id, opts.Flag)
+			local options = normalizeOptions(first(opts.Options, opts.Values, opts.List, {}))
+			local multi = first(opts.Multi, opts.MultiSelect, false) == true
+			local control
+			local userCallback = toCallback(opts)
+			control = patchControl(nativeDropdown(self, {
+				Name = toName(opts, "Dropdown"),
+				Options = options,
+				Multi = multi,
+				Search = opts.Search == true,
+				Required = opts.Required ~= false,
+				Default = normalizeDefault(first(opts.Default, opts.Value, opts.CurrentOption), options, multi),
+				Callback = callbackProxy(userCallback, function() return control end),
+			}), "Dropdown")
+			control.Options = options
+			control.Value = control.Value or first(opts.Default, opts.Value, opts.CurrentOption)
+			local rawSet = control.Set
+			function control:Set(value)
+				if not multi and type(value) == "string" then
+					for i, option in ipairs(self.Options or {}) do
+						if option == value then
+							rawSet(self, i)
+							self.Value = value
+							return self
+						end
+					end
+				end
+				rawSet(self, value)
+				self.Value = value
+				return self
+			end
+			control.SetValue = function(self, value) return self:Set(value) end
+			function control:SetValues(values)
+				local normalized = normalizeOptions(values)
+				self.Options = normalized
+				if self.ClearOptions then self:ClearOptions() end
+				if self.InsertOptions then self:InsertOptions(normalized) end
+				return self
+			end
+			return registerOption(id, control)
+		end
+		section.AddDropdown = section.AddDropdown or function(self, title, opts)
+			local _, merged = mergeIdOptions(title, opts)
+			opts = merged
+			return self:Dropdown(opts)
+		end
+
+		local nativeParagraph = section.Paragraph
+		function section:Paragraph(opts)
+			opts = opts or {}
+			local id = first(opts.Id, opts.Flag)
+			return registerOption(id, patchControl(nativeParagraph(self, {
+				Header = toName(opts, "Paragraph"),
+				Body = toDescription(opts),
+			}), "Paragraph"))
+		end
+		section.AddParagraph = section.AddParagraph or function(self, title, opts)
+			local _, merged = mergeIdOptions(title, opts)
+			opts = merged
+			return self:Paragraph(opts)
+		end
+
+		local nativeHeader = section.Header
+		section.AddSectionHeader = section.AddSectionHeader or function(self, opts)
+			return patchControl(nativeHeader(self, { Text = toName(opts, "Header") }), "Header")
+		end
+		section.AddDivider = section.AddDivider or function(self) return self:Divider() end
+		section.AddSpacer = section.AddSpacer or function(self) return self:Spacer() end
+
+		return section
+	end
+
+	local function patchTab(tab)
+		if type(tab) ~= "table" or tab.__MacCompatTab then
+			return tab
+		end
+		tab.__MacCompatTab = true
+		local sideIndex = 0
+		local nativeSection = tab.Section
+		local defaultSection
+		local function getDefaultSection(self)
+			if not defaultSection then
+				defaultSection = self:Section({ Title = "Main", Side = "Left" })
+			end
+			return defaultSection
+		end
+		function tab:Section(opts)
+			opts = opts or {}
+			sideIndex += 1
+			local section = patchSection(nativeSection(self, {
+				Side = opts.Side or opts.Position or ((sideIndex % 2 == 1) and "Left" or "Right"),
+			}))
+			local title = first(opts.Title, opts.Name, opts.Text)
+			if title and section.Header then
+				pcall(function() section:Header({ Text = tostring(title) }) end)
+			end
+			local desc = first(opts.Desc, opts.Description, opts.Body)
+			if desc and section.SubLabel then
+				pcall(function() section:SubLabel({ Text = tostring(desc) }) end)
+			end
+			return section
+		end
+		tab.AddSection = tab.AddSection or function(self, title, opts)
+			if type(title) == "table" then opts = title else opts = opts or {}; opts.Title = opts.Title or title end
+			return self:Section(opts)
+		end
+		tab.CreateSection = tab.CreateSection or tab.AddSection
+		for _, method in ipairs({
+			"Button", "Toggle", "Slider", "Input", "Dropdown", "Paragraph",
+			"AddButton", "AddToggle", "AddSlider", "AddInput", "AddDropdown", "AddParagraph",
+			"AddDivider", "AddSpacer"
+		}) do
+			if tab[method] == nil then
+				tab[method] = function(self, ...)
+					local section = getDefaultSection(self)
+					return section[method](section, ...)
+				end
+			end
+		end
+		return tab
+	end
+
+	local function patchWindow(window)
+		if type(window) ~= "table" or window.__MacCompatWindow then
+			return window
+		end
+		window.__MacCompatWindow = true
+		window.__MacCompatTabs = window.__MacCompatTabs or {}
+		window.__MacCompatTabGroup = window.__MacCompatTabGroup or window:TabGroup()
+
+		local nativeNotify = window.Notify
+		function window:Notify(opts)
+			opts = opts or {}
+			return patchControl(nativeNotify(self, {
+				Title = tostring(first(opts.Title, opts.Name, "Notification")),
+				Description = tostring(first(opts.Description, opts.Desc, opts.Content, opts.Text, "")),
+				Lifetime = first(opts.Lifetime, opts.Duration, opts.Time, 5),
+				Callback = toCallback(opts),
+			}), "Notification")
+		end
+
+		local nativeDialog = window.Dialog
+		if nativeDialog then
+			function window:Dialog(opts)
+				opts = opts or {}
+				local buttons = {}
+				for _, button in ipairs(opts.Buttons or {}) do
+					table.insert(buttons, {
+						Title = tostring(first(button.Title, button.Text, button.Name, "OK")),
+						Callback = toCallback(button),
+					})
+				end
+				if #buttons == 0 then
+					buttons = {{ Title = "OK" }}
+				end
+				return nativeDialog(self, {
+					Title = tostring(first(opts.Title, opts.Name, "Dialog")),
+					Description = tostring(first(opts.Description, opts.Content, opts.Text, "")),
+					Buttons = buttons,
+				})
+			end
+		end
+
+		function window:Tab(opts)
+			opts = opts or {}
+			local tab = patchTab(self.__MacCompatTabGroup:Tab({
+				Name = toName(opts, "Tab"),
+				Image = first(opts.Image, opts.Icon),
+			}))
+			table.insert(self.__MacCompatTabs, tab)
+			return tab
+		end
+		window.AddTab = window.AddTab or function(self, title, opts)
+			if type(title) == "table" then opts = title else opts = opts or {}; opts.Title = opts.Title or title end
+			return self:Tab(opts)
+		end
+		window.CreateTab = window.CreateTab or window.AddTab
+		window.Section = window.Section or function(self, opts)
+			opts = opts or {}
+			local group = {
+				Title = toName(opts, "Section"),
+				Window = self,
+			}
+			function group:Tab(tabConfig)
+				return self.Window:Tab(tabConfig)
+			end
+			function group:AddTab(tabConfig)
+				return self:Tab(tabConfig)
+			end
+			function group:Open() self.Opened = true end
+			function group:Close() self.Opened = false end
+			return group
+		end
+
+		window.SelectTab = window.SelectTab or function(self, tabOrIndex)
+			local tab = type(tabOrIndex) == "number" and self.__MacCompatTabs[tabOrIndex] or tabOrIndex
+			if type(tab) == "table" and tab.Select then
+				return tab:Select()
+			end
+		end
+		window.SetCompact = window.SetCompact or function() end
+		window.SetTheme = window.SetTheme or function(self, theme) self.__MacCompatTheme = theme end
+		window.GetCurrentTheme = window.GetCurrentTheme or function(self) return self.__MacCompatTheme or "Dark" end
+		window.GetThemes = window.GetThemes or function()
+			return {"Dark", "Light", "Midnight", "Aqua", "Rose", "Emerald", "Purple", "Rainbow"}
+		end
+		window.Tag = window.Tag or function() end
+		window.EditOpenButton = window.EditOpenButton or function() end
+		window.SetFooter = window.SetFooter or function(self, value) self.__MacCompatFooter = value end
+		window.SetBackground = window.SetBackground or function(self, value) self.__MacCompatBackground = value end
+		window.SetBackgroundImage = window.SetBackgroundImage or window.SetBackground
+		window.Destroy = window.Destroy or function(self) return self:Unload() end
+		window.ToggleAcrylic = window.ToggleAcrylic or function(self, value) self.Acrylic = value end
+		window.ToggleTransparency = window.ToggleTransparency or function(self, value) self.Transparent = value end
+		window.OnClose = window.OnClose or function(self, callback) self.__MacCompatOnClose = callback end
+		window.OnDestroy = window.OnDestroy or function(self, callback) self.__MacCompatOnDestroy = callback end
+		return window
+	end
+
+	local nativeWindow = MacLib.Window
+	function MacLib:Window(settings)
+		if self ~= MacLib then
+			settings = self
+			self = MacLib
+		end
+		settings = settings or {}
+		local window = nativeWindow(self, {
+			Title = tostring(first(settings.Title, settings.Name, "MacLib")),
+			Subtitle = tostring(first(settings.Subtitle, settings.SubTitle, settings.Description, "")),
+			Size = settings.Size,
+			Accent = settings.Accent,
+			AcrylicBlur = settings.AcrylicBlur,
+			DisabledWindowControls = settings.DisabledWindowControls,
+			WindowControls = settings.WindowControls,
+		})
+		self.__LastWindow = patchWindow(window)
+		self.Window = self.__LastWindow
+		self.UseAcrylic = settings.Acrylic or false
+		self.Acrylic = settings.Acrylic or false
+		self.Transparent = settings.Transparent or false
+		return self.__LastWindow
+	end
+
+	MacLib.CreateWindow = MacLib.CreateWindow or function(self, settings)
+		if self ~= MacLib then
+			settings = self
+			self = MacLib
+		end
+		return self:Window(settings)
+	end
+	MacLib.MakeWindow = MacLib.MakeWindow or MacLib.CreateWindow
+	MacLib.NewWindow = MacLib.NewWindow or MacLib.CreateWindow
+
+	function MacLib:Notify(opts)
+		if self ~= MacLib then
+			opts = self
+			self = MacLib
+		end
+		if self.__LastWindow and self.__LastWindow.Notify then
+			return self.__LastWindow:Notify(opts)
+		end
+		local window = self:CreateWindow({ Title = "Notification" })
+		return window:Notify(opts)
+	end
+
+	MacLib.SetTheme = MacLib.SetTheme or function(self, theme)
+		if self ~= MacLib then theme = self; self = MacLib end
+		self.__MacCompatTheme = theme
+	end
+	MacLib.ToggleAcrylic = MacLib.ToggleAcrylic or function(self, value)
+		if self ~= MacLib then value = self; self = MacLib end
+		self.Acrylic = value
+	end
+	MacLib.ToggleTransparency = MacLib.ToggleTransparency or function(self, value)
+		if self ~= MacLib then value = self; self = MacLib end
+		self.Transparent = value
+	end
+	MacLib.Destroy = MacLib.Destroy or function(self)
+		if self ~= MacLib then self = MacLib end
+		if self.__LastWindow and self.__LastWindow.Destroy then
+			return self.__LastWindow:Destroy()
+		end
+	end
+	MacLib.GetThemes = MacLib.GetThemes or function()
+		return {"Dark", "Light", "Midnight", "Aqua", "Rose", "Emerald", "Purple", "Rainbow"}
+	end
+	MacLib.GetCurrentTheme = MacLib.GetCurrentTheme or function(self)
+		if self ~= MacLib then self = MacLib end
+		return self.__MacCompatTheme or "Dark"
+	end
+end
+
 return MacLib
