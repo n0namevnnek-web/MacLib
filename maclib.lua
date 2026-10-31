@@ -633,7 +633,7 @@ function MacLib:Window(Settings)
 
 	local titleFrameUIListLayout = Instance.new("UIListLayout")
 	titleFrameUIListLayout.Name = "TitleFrameUIListLayout"
-	titleFrameUIListLayout.Padding = UDim.new(0, 3)
+	titleFrameUIListLayout.Padding = UDim.new(0, 5)
 	titleFrameUIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	titleFrameUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 	titleFrameUIListLayout.Parent = titleFrame
@@ -803,14 +803,28 @@ function MacLib:Window(Settings)
 
 	local function updateHeaderTagLayout()
 		-- The holder has 23px left and 22px right padding. Keep another 21px on
-		-- the right for the globe/settings button.
+		-- the right for the bell and globe/settings buttons.
 		local contentWidth = math.max(0, informationHolder.AbsoluteSize.X - 45)
-		local wantedX = math.max(0, math.ceil(title.TextBounds.X) + 8)
-		local maxX = math.max(0, contentWidth - 106)
-		local x = math.min(wantedX, maxX)
-		local width = math.clamp(contentWidth - x - 42, 62, 84)
-		tagRail.Position = UDim2.fromOffset(x, 2)
-		tagRail.Size = UDim2.fromOffset(width + 2, 24)
+		local wantedX = math.max(0, math.ceil(title.TextBounds.X) + 11)
+		local narrowHeader = wantedX + 62 + 42 > contentWidth
+		if narrowHeader then
+			-- Mobile/narrow sidebar: give the tag its own row instead of moving it
+			-- backwards over the title.
+			information.Size = UDim2.new(1, 0, 0, 84)
+			sidebarGroup.Position = UDim2.fromOffset(0, 115)
+			sidebarGroup.Size = UDim2.new(1, 0, 1, -115)
+			titleFrame.Size = UDim2.new(1, 0, 0, 42)
+			tagRail.Position = UDim2.fromOffset(0, 44)
+			tagRail.Size = UDim2.fromOffset(math.min(86, math.max(64, contentWidth - 42)), 24)
+		else
+			information.Size = UDim2.new(1, 0, 0, 60)
+			sidebarGroup.Position = UDim2.fromOffset(0, 91)
+			sidebarGroup.Size = UDim2.new(1, 0, 1, -91)
+			titleFrame.Size = UDim2.fromScale(1, 1)
+			local width = math.clamp(contentWidth - wantedX - 42, 62, 84)
+			tagRail.Position = UDim2.fromOffset(wantedX, 2)
+			tagRail.Size = UDim2.fromOffset(width + 2, 24)
+		end
 	end
 	title:GetPropertyChangedSignal("TextBounds"):Connect(updateHeaderTagLayout)
 	informationHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateHeaderTagLayout)
@@ -1491,8 +1505,8 @@ function MacLib:Window(Settings)
 	notificationHistoryPanel.AnchorPoint = Vector2.new(1, 0)
 	notificationHistoryPanel.Position = UDim2.new(1, -14, 0, 44)
 	notificationHistoryPanel.Size = UDim2.fromOffset(300, 330)
-	notificationHistoryPanel.BackgroundColor3 = Color3.fromRGB(16, 17, 20)
-	notificationHistoryPanel.BackgroundTransparency = 0.04
+	notificationHistoryPanel.BackgroundColor3 = Color3.fromRGB(245, 246, 249)
+	notificationHistoryPanel.BackgroundTransparency = 0.8
 	notificationHistoryPanel.BorderSizePixel = 0
 	notificationHistoryPanel.Visible = false
 	notificationHistoryPanel.ZIndex = 300
@@ -1502,7 +1516,7 @@ function MacLib:Window(Settings)
 	historyCorner.Parent = notificationHistoryPanel
 	local historyStroke = Instance.new("UIStroke")
 	historyStroke.Color = Color3.fromRGB(225, 227, 232)
-	historyStroke.Transparency = 0.84
+	historyStroke.Transparency = 0.68
 	historyStroke.Parent = notificationHistoryPanel
 
 	local historyTitle = Instance.new("TextLabel")
@@ -6609,8 +6623,8 @@ function MacLib:Window(Settings)
 		notification.Name = "Notification"
 		notification.AnchorPoint = Vector2.new(0.5, 0.5)
 		notification.AutomaticSize = Enum.AutomaticSize.Y
-		notification.BackgroundColor3 = Color3.fromRGB(245, 246, 249)
-		notification.BackgroundTransparency = tonumber(Settings.BackgroundTransparency) or 0.72
+		notification.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+		notification.BackgroundTransparency = tonumber(Settings.BackgroundTransparency) or 0
 		notification.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		notification.BorderSizePixel = 0
 		notification.Position = UDim2.fromScale(0.5, 0.5)
@@ -6622,7 +6636,7 @@ function MacLib:Window(Settings)
 		notificationUIStroke.Name = "NotificationUIStroke"
 		notificationUIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		notificationUIStroke.Color = Color3.fromRGB(255, 255, 255)
-		notificationUIStroke.Transparency = 0.62
+		notificationUIStroke.Transparency = 0.9
 		notificationUIStroke.Parent = notification
 
 		local notificationUICorner = Instance.new("UICorner")
@@ -6826,15 +6840,17 @@ function MacLib:Window(Settings)
 		dialogCanvas.BorderSizePixel = 0
 		dialogCanvas.Size = UDim2.fromScale(1, 1)
 		dialogCanvas.GroupTransparency = 1
+		dialogCanvas.ZIndex = 400
 		dialogCanvas.Parent = base
 
 		local dialog = Instance.new("Frame")
 		dialog.Name = "Dialog"
 		dialog.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		dialog.BackgroundTransparency = 0.5
+		dialog.BackgroundTransparency = 0.38
 		dialog.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		dialog.BorderSizePixel = 0
 		dialog.Size = UDim2.fromScale(1, 1)
+		dialog.ZIndex = 400
 
 		local baseUICorner = Instance.new("UICorner")
 		baseUICorner.Name = "BaseUICorner"
@@ -6845,11 +6861,13 @@ function MacLib:Window(Settings)
 		prompt.Name = "Prompt"
 		prompt.AnchorPoint = Vector2.new(0.5, 0.5)
 		prompt.AutomaticSize = Enum.AutomaticSize.Y
-		prompt.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+		prompt.BackgroundColor3 = Color3.fromRGB(23, 24, 28)
+		prompt.BackgroundTransparency = 0.04
 		prompt.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		prompt.BorderSizePixel = 0
 		prompt.Position = UDim2.fromScale(0.5, 0.5)
-		prompt.Size = UDim2.fromOffset(280, 0)
+		prompt.Size = UDim2.fromOffset(320, 0)
+		prompt.ZIndex = 401
 
 		local promptUIScale = Instance.new("UIScale")
 		promptUIScale.Name = "PromptUIScale"
@@ -6860,12 +6878,12 @@ function MacLib:Window(Settings)
 		globalSettingsUIStroke.Name = "GlobalSettingsUIStroke"
 		globalSettingsUIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		globalSettingsUIStroke.Color = Color3.fromRGB(255, 255, 255)
-		globalSettingsUIStroke.Transparency = 0.9
+		globalSettingsUIStroke.Transparency = 0.82
 		globalSettingsUIStroke.Parent = prompt
 
 		local globalSettingsUICorner = Instance.new("UICorner")
 		globalSettingsUICorner.Name = "GlobalSettingsUICorner"
-		globalSettingsUICorner.CornerRadius = UDim.new(0, 4)
+		globalSettingsUICorner.CornerRadius = UDim.new(0, 10)
 		globalSettingsUICorner.Parent = prompt
 
 		local globalSettingsUIPadding = Instance.new("UIPadding")
@@ -6896,7 +6914,7 @@ function MacLib:Window(Settings)
 		paragraphHeader.Text = Settings.Title
 		paragraphHeader.TextColor3 = Color3.fromRGB(255, 255, 255)
 		paragraphHeader.TextSize = 18
-		paragraphHeader.TextTransparency = 0.4
+		paragraphHeader.TextTransparency = 0.08
 		paragraphHeader.TextWrapped = true
 		paragraphHeader.AutomaticSize = Enum.AutomaticSize.Y
 		paragraphHeader.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -6923,7 +6941,7 @@ function MacLib:Window(Settings)
 		paragraphBody.Text = Settings.Description
 		paragraphBody.TextColor3 = Color3.fromRGB(255, 255, 255)
 		paragraphBody.TextSize = 14
-		paragraphBody.TextTransparency = 0.5
+		paragraphBody.TextTransparency = 0.34
 		paragraphBody.TextWrapped = true
 		paragraphBody.AutomaticSize = Enum.AutomaticSize.Y
 		paragraphBody.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -6949,6 +6967,8 @@ function MacLib:Window(Settings)
 		local uIListLayout1 = Instance.new("UIListLayout")
 		uIListLayout1.Name = "UIListLayout"
 		uIListLayout1.Padding = UDim.new(0, 10)
+		uIListLayout1.FillDirection = Enum.FillDirection.Horizontal
+		uIListLayout1.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		uIListLayout1.SortOrder = Enum.SortOrder.LayoutOrder
 		uIListLayout1.Parent = interactions
 
@@ -7010,14 +7030,20 @@ function MacLib:Window(Settings)
 			button.Text = tostring(v.Name or v.Title or v.Text or "OK")
 			button.TextColor3 = Color3.fromRGB(255, 255, 255)
 			button.TextSize = 15
-			button.TextTransparency = 0.5
+			button.TextTransparency = 0.12
 			button.TextTruncate = Enum.TextTruncate.AtEnd
 			button.AutoButtonColor = false
 			button.AutomaticSize = Enum.AutomaticSize.Y
-			button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+			local buttonName = tostring(v.Name or v.Title or v.Text or "OK")
+			local lowerButtonName = string.lower(buttonName)
+			local destructive = lowerButtonName:find("close", 1, true)
+				or lowerButtonName:find("delete", 1, true)
+				or lowerButtonName:find("unload", 1, true)
+			button.BackgroundColor3 = destructive and Color3.fromRGB(206, 72, 72) or Color3.fromRGB(255, 255, 255)
+			button.BackgroundTransparency = destructive and 0.38 or 0.92
 			button.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			button.BorderSizePixel = 0
-			button.Size = UDim2.fromScale(1, 0)
+			button.Size = UDim2.new(0.5, -5, 0, 0)
 
 			local uIPadding1 = Instance.new("UIPadding")
 			uIPadding1.Name = "UIPadding"
@@ -7029,16 +7055,16 @@ function MacLib:Window(Settings)
 
 			local baseUICorner1 = Instance.new("UICorner")
 			baseUICorner1.Name = "BaseUICorner"
-			baseUICorner1.CornerRadius = UDim.new(0, 4)
+			baseUICorner1.CornerRadius = UDim.new(0, 7)
 			baseUICorner1.Parent = button
 
 			button.Parent = interactions
 			
 			local TweenSettings = {
-				DefaultTransparency = 0,
-				DefaultTransparency2 = 0.5,
-				HoverTransparency = 0.3,
-				HoverTransparency2 = 0.6,
+				DefaultTransparency = destructive and 0.38 or 0.92,
+				DefaultTransparency2 = 0.12,
+				HoverTransparency = destructive and 0.22 or 0.84,
+				HoverTransparency2 = 0.02,
 
 				EasingStyle = Enum.EasingStyle.Sine
 			}
@@ -7059,13 +7085,8 @@ function MacLib:Window(Settings)
 			
 			button.MouseButton1Click:Connect(function()
 				if dialogCanvas.GroupTransparency ~= 0 then return end
-				if v.Callback then
-					v.Callback()
-				end
-				
-				dialog.Parent = dialogCanvas
-				
 				dialogOut()
+				if v.Callback then task.spawn(v.Callback) end
 			end)
 			
 			button.MouseEnter:Connect(function()
@@ -7511,30 +7532,30 @@ function MacLib:Window(Settings)
 
 	minimize.MouseButton1Click:Connect(ToggleMenu)
 	local closeConfirmationOpen = false
-	local closeConfirmationToken = 0
 	exit.MouseButton1Click:Connect(function()
 		if Settings.ConfirmClose == false then
 			WindowFunctions:Unload()
 			return
 		end
-		if closeConfirmationOpen then
-			WindowFunctions:Unload()
-			return
-		end
+		if closeConfirmationOpen then return end
 		closeConfirmationOpen = true
-		WindowFunctions:Notify({
+		WindowFunctions:Dialog({
 			Title = "Close Menu?",
-			Description = "Press the red button again within 4 seconds to unload.",
-			Lifetime = 4,
-			SkipHistory = true,
+			Description = "Are you sure you want to unload this interface?",
+			Buttons = {
+				{
+					Name = "Cancel",
+					Callback = function() closeConfirmationOpen = false end,
+				},
+				{
+					Name = "Close",
+					Callback = function()
+						closeConfirmationOpen = false
+						WindowFunctions:Unload()
+					end,
+				},
+			},
 		})
-		closeConfirmationToken += 1
-		local confirmationToken = closeConfirmationToken
-		task.delay(4, function()
-			if closeConfirmationToken == confirmationToken then
-				closeConfirmationOpen = false
-			end
-		end)
 	end)
 
 	function WindowFunctions:SetKeybind(Keycode)
