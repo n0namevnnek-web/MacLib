@@ -1,8 +1,3 @@
---[[
-!! OUTDATED REPOSITORY !! Please use the new repository:
-https://github.com/biggaboy212/Maclib/tree/main
-]]
-
 local MacLib = {}
 
 --// Services
@@ -423,7 +418,7 @@ function MacLib:Window(Settings)
 	information.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	information.BorderSizePixel = 0
 	information.Position = UDim2.fromOffset(0, 31)
-	information.Size = UDim2.new(1, 0, 0, 90)
+	information.Size = UDim2.new(1, 0, 0, 60)
 
 	local divider2 = Instance.new("Frame")
 	divider2.Name = "Divider"
@@ -441,7 +436,7 @@ function MacLib:Window(Settings)
 	informationHolder.BackgroundTransparency = 1
 	informationHolder.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	informationHolder.BorderSizePixel = 0
-	informationHolder.Size = UDim2.new(1, 0, 0, 56)
+	informationHolder.Size = UDim2.fromScale(1, 1)
 
 	local informationHolderUIPadding = Instance.new("UIPadding")
 	informationHolderUIPadding.Name = "InformationHolderUIPadding"
@@ -503,7 +498,7 @@ function MacLib:Window(Settings)
 	title.RichText = true
 	title.TextSize = 20
 	title.TextTransparency = 0.2
-	title.TextTruncate = Enum.TextTruncate.SplitWord
+	title.TextTruncate = Enum.TextTruncate.None
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.TextYAlignment = Enum.TextYAlignment.Top
 	title.AutomaticSize = Enum.AutomaticSize.Y
@@ -558,8 +553,8 @@ function MacLib:Window(Settings)
 	sidebarGroup.BackgroundTransparency = 1
 	sidebarGroup.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	sidebarGroup.BorderSizePixel = 0
-	sidebarGroup.Position = UDim2.fromOffset(0, 121)
-	sidebarGroup.Size = UDim2.new(1, 0, 1, -121)
+	sidebarGroup.Position = UDim2.fromOffset(0, 91)
+	sidebarGroup.Size = UDim2.new(1, 0, 1, -91)
 
 	local userInfo = Instance.new("Frame")
 	userInfo.Name = "UserInfo"
@@ -690,8 +685,8 @@ function MacLib:Window(Settings)
 
 	informationGroup.Parent = userInfo
 
-	-- A compact, horizontally scrollable tag rail beneath the user identity.
-	-- Mouse wheel and touch dragging both work through the native ScrollingFrame.
+	-- Compact tag rail beside the window title. Its position follows the rendered
+	-- title width so short titles do not leave a gap and longer titles are not cut.
 	local tagRail = Instance.new("ScrollingFrame")
 	tagRail.Name = "TagRail"
 	tagRail.Active = true
@@ -703,11 +698,26 @@ function MacLib:Window(Settings)
 	tagRail.ScrollBarThickness = 0
 	tagRail.CanvasSize = UDim2.new()
 	tagRail.AnchorPoint = Vector2.new(0, 0)
-	tagRail.Position = UDim2.fromOffset(23, 58)
-	tagRail.Size = UDim2.new(1, -46, 0, 27)
+	tagRail.Position = UDim2.fromOffset(96, 1)
+	tagRail.Size = UDim2.fromOffset(76, 27)
 	tagRail.ScrollingDirection = Enum.ScrollingDirection.X
-	tagRail.Parent = information
+	tagRail.Parent = informationHolder
 	titleFrame.Size = UDim2.fromScale(1, 1)
+
+	local function updateHeaderTagLayout()
+		-- The holder has 23px left and 22px right padding. Keep another 21px on
+		-- the right for the globe/settings button.
+		local contentWidth = math.max(0, informationHolder.AbsoluteSize.X - 45)
+		local wantedX = math.max(0, math.ceil(title.TextBounds.X) + 8)
+		local maxX = math.max(0, contentWidth - 74)
+		local x = math.min(wantedX, maxX)
+		local width = math.clamp(contentWidth - x - 21, 52, 96)
+		tagRail.Position = UDim2.fromOffset(x, 1)
+		tagRail.Size = UDim2.fromOffset(width, 27)
+	end
+	title:GetPropertyChangedSignal("TextBounds"):Connect(updateHeaderTagLayout)
+	informationHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateHeaderTagLayout)
+	task.defer(updateHeaderTagLayout)
 
 	local tagRailLayout = Instance.new("UIListLayout")
 	tagRailLayout.FillDirection = Enum.FillDirection.Horizontal
