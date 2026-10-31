@@ -423,7 +423,7 @@ function MacLib:Window(Settings)
 	information.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	information.BorderSizePixel = 0
 	information.Position = UDim2.fromOffset(0, 31)
-	information.Size = UDim2.new(1, 0, 0, 60)
+	information.Size = UDim2.new(1, 0, 0, 90)
 
 	local divider2 = Instance.new("Frame")
 	divider2.Name = "Divider"
@@ -441,7 +441,7 @@ function MacLib:Window(Settings)
 	informationHolder.BackgroundTransparency = 1
 	informationHolder.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	informationHolder.BorderSizePixel = 0
-	informationHolder.Size = UDim2.fromScale(1, 1)
+	informationHolder.Size = UDim2.new(1, 0, 0, 56)
 
 	local informationHolderUIPadding = Instance.new("UIPadding")
 	informationHolderUIPadding.Name = "InformationHolderUIPadding"
@@ -558,8 +558,8 @@ function MacLib:Window(Settings)
 	sidebarGroup.BackgroundTransparency = 1
 	sidebarGroup.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	sidebarGroup.BorderSizePixel = 0
-	sidebarGroup.Position = UDim2.fromOffset(0, 91)
-	sidebarGroup.Size = UDim2.new(1, 0, 1, -91)
+	sidebarGroup.Position = UDim2.fromOffset(0, 121)
+	sidebarGroup.Size = UDim2.new(1, 0, 1, -121)
 
 	local userInfo = Instance.new("Frame")
 	userInfo.Name = "UserInfo"
@@ -702,12 +702,12 @@ function MacLib:Window(Settings)
 	tagRail.TopImage = ""
 	tagRail.ScrollBarThickness = 0
 	tagRail.CanvasSize = UDim2.new()
-	tagRail.AnchorPoint = Vector2.new(1, 0.5)
-	tagRail.Position = UDim2.new(1, -24, 0.5, 0)
-	tagRail.Size = UDim2.fromOffset(96, 30)
+	tagRail.AnchorPoint = Vector2.new(0, 0)
+	tagRail.Position = UDim2.fromOffset(23, 58)
+	tagRail.Size = UDim2.new(1, -46, 0, 27)
 	tagRail.ScrollingDirection = Enum.ScrollingDirection.X
-	tagRail.Parent = informationHolder
-	titleFrame.Size = UDim2.new(1, -112, 1, 0)
+	tagRail.Parent = information
+	titleFrame.Size = UDim2.fromScale(1, 1)
 
 	local tagRailLayout = Instance.new("UIListLayout")
 	tagRailLayout.FillDirection = Enum.FillDirection.Horizontal
