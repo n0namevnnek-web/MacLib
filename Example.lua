@@ -1,356 +1,321 @@
--- ?t=<time> busts raw.githubusercontent.com's ~5 min CDN cache so you always get the latest push
-local MacLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/n0namevnnek-web/MacLib/refs/heads/main/maclib.lua?t=" .. tostring(os.time())))()
+-- MacLib Modern - full component example
+-- Upload MacLib_Modern.lua, then replace the URL below with its raw URL.
+
+local MACLIB_URL = "https://raw.githubusercontent.com/n0namevnnek-web/MacLib/refs/heads/main/maclib.lua?v=20261031-1745"
+
+local MacLib = loadstring(game:HttpGet(MACLIB_URL))()
 
 local Window = MacLib:Window({
-	Title = "Maclib Demo",
-	Subtitle = "This is a subtitle.",
+	Title = "MacLib Modern",
+	Subtitle = "Named icons, assets and glass components",
 	Size = UDim2.fromOffset(868, 650),
-	DragStyle = 1,
-	DisabledWindowControls = {},
 	ShowUserInfo = true,
+	Anonymous = true,
+	AnonymousName = "Anonymous User",
+	AutoSelect = true,
+	Footer = {
+		{ Text = "MacLib Modern", Copyable = false },
+		{ Text = "|", Copyable = false },
+		{ Text = "Compatibility API", Copyable = false },
+		{ Text = "|", Copyable = false },
+		{ Text = "discord.gg/n4DbXTyNPj", Copyable = true, CopyText = "https://discord.gg/n4DbXTyNPj" },
+	},
 	Keybind = Enum.KeyCode.RightControl,
 	AcrylicBlur = true,
+
+	Tags = {
+		{ Title = "NO KEY", Icon = "key-round", Color = Color3.fromRGB(130, 160, 255) },
+		{ Title = "PREMIUM", Icon = "crown", Color = Color3.fromRGB(238, 187, 84) },
+		{ Title = "SECURE", Icon = "shield-check", Color = Color3.fromRGB(74, 207, 130) },
+		{ Title = "MOBILE", Icon = "smartphone", Color = Color3.fromRGB(180, 184, 194) },
+	},
+
+	OpenButton = {
+		Enabled = true,
+		Color = Color3.fromRGB(225, 227, 232),
+		Size = UDim2.fromOffset(118, 34),
+		Position = UDim2.new(0.5, 0, 0, 18),
+		Draggable = true,
+		Bobbing = true,
+		BounceHeight = 3,
+		BounceSpeed = 1.05,
+		Pulse = true,
+		PulseSpeed = 1.45,
+		DynamicColor = false,
+		MaxPing = 300,
+		UpdateRate = 0.8,
+	},
 })
 
-local globalSettings = {
-	UIBlurToggle = Window:GlobalSetting({
-		Name = "UI Blur",
-		Default = Window:GetAcrylicBlurState(),
-		Callback = function(bool)
-			Window:SetAcrylicBlurState(bool)
-			Window:Notify({
-				Title = Window.Settings.Title,
-				Description = (bool and "Enabled" or "Disabled") .. " UI Blur",
-				Lifetime = 5
-			})
-		end,
-	}),
-	NotificationToggler = Window:GlobalSetting({
-		Name = "Notifications",
-		Default = Window:GetNotificationsState(),
-		Callback = function(bool)
-			Window:SetNotificationsState(bool)
-			Window:Notify({
-				Title = Window.Settings.Title,
-				Description = (bool and "Enabled" or "Disabled") .. " Notifications",
-				Lifetime = 5
-			})
-		end,
-	}),
-	ShowUserInfo = Window:GlobalSetting({
-		Name = "Show User Info",
-		Default = Window:GetUserInfoState(),
-		Callback = function(bool)
-			Window:SetUserInfoState(bool)
-			Window:Notify({
-				Title = Window.Settings.Title,
-				Description = (bool and "Showing" or "Redacted") .. " User Info",
-				Lifetime = 5
-			})
-		end,
-	})
-}
+local TabGroup = Window:TabGroup()
 
-local tabGroups = {
-	TabGroup1 = Window:TabGroup()
-}
-
-local tabs = {
-	Main = tabGroups.TabGroup1:Tab({ Name = "Demo", Image = "rbxassetid://18821914323" }),
-	Settings = tabGroups.TabGroup1:Tab({ Name = "Settings", Image = "rbxassetid://10734950309" })
-}
-
-local sections = {
-	MainSection1 = tabs.Main:Section({ Side = "Left" }),
-}
-
-sections.MainSection1:Header({
-	Name = "Header #1"
+-- Named Lucide icon.
+local HomeTab = TabGroup:Tab({
+	Name = "Named Icon",
+	Icon = "house",
 })
 
-sections.MainSection1:Button({
-	Name = "Button",
-	Tooltip = "Opens a confirmation dialog", -- hover this control to see the tooltip
+-- A direct Roblox image asset remains fully supported.
+local AssetTab = TabGroup:Tab({
+	Name = "Asset Icon",
+	Image = "rbxassetid://18821914323",
+})
+
+-- The optional lucide: prefix is supported too.
+local ComponentsTab = TabGroup:Tab({
+	Name = "Components",
+	Icon = "lucide:boxes",
+})
+
+-- Fluent/UltraObsidian-style API used by larger existing scripts.
+local CompatibilityTab = Window:AddTab({
+	Title = "Compatibility",
+	Icon = "workflow",
+})
+
+local HomeLeft = HomeTab:Section({ Side = "Left" })
+local HomeRight = HomeTab:Section({ Side = "Right" })
+local AssetLeft = AssetTab:Section({ Side = "Left" })
+local AssetRight = AssetTab:Section({ Side = "Right" })
+local ComponentsLeft = ComponentsTab:Section({ Side = "Left" })
+local ComponentsRight = ComponentsTab:Section({ Side = "Right" })
+local CompatibilitySection = CompatibilityTab:AddSection({
+	Title = "Fluent-style Controls",
+	Icon = "blocks",
+})
+
+local CompatToggle = CompatibilitySection:AddToggle("CompatToggle", {
+	Title = "Flagged Toggle",
+	Description = "Uses AddToggle(flag, config)",
+	Default = false,
+	Callback = function(value) print("CompatToggle:", value) end,
+})
+
+CompatibilitySection:AddDropdown("CompatDropdown", {
+	Title = "Searchable Dropdown",
+	Values = { "Alpha", "Beta", "Gamma" },
+	Default = "Alpha",
+	Searchable = true,
+	Callback = function(value) print("CompatDropdown:", value) end,
+})
+
+CompatibilitySection:AddSlider("CompatSlider", {
+	Title = "Compatible Slider",
+	Min = 0,
+	Max = 100,
+	Default = 35,
+	Callback = function(value) print("CompatSlider:", value) end,
+})
+
+CompatibilitySection:AddButton({
+	Title = "Toggle Lock State",
+	Icon = "lock-keyhole",
 	Callback = function()
-		Window:Dialog({
-			Title = Window.Settings.Title,
-			Description = "Lorem ipsum odor amet, consectetuer adipiscing elit. Eros vestibulum aliquet mattis, ex platea nunc.",
-			Buttons = {
-				{
-					Name = "Confirm",
-					Callback = function()
-						print("Confirmed!")
-					end,
-				},
-				{
-					Name = "Cancel"
-				}
-			}
+		CompatToggle:SetLocked(not CompatToggle.Locked)
+	end,
+})
+
+HomeLeft:Header({
+	Name = "Modern Glass UI",
+	Icon = "sparkles",
+})
+
+local Status = HomeLeft:Status({
+	Title = "Service Status",
+	Description = "All systems are ready",
+	Status = "ONLINE",
+	Icon = "circle-check",
+	Color = Color3.fromRGB(74, 207, 130),
+})
+
+local Progress = HomeLeft:ProgressBar({
+	Title = "Loading Assets",
+	Value = 72,
+	Max = 100,
+})
+
+HomeLeft:ButtonRow({
+	Buttons = {
+		{
+			Title = "Refresh",
+			Icon = "refresh-cw",
+			Callback = function()
+				Progress:SetValue(math.random(20, 100))
+			end,
+		},
+		{
+			Title = "Online",
+			Icon = "wifi",
+			Callback = function()
+				Status:SetStatus("ONLINE", Color3.fromRGB(74, 207, 130))
+				Status:SetDescription("Connection refreshed successfully")
+			end,
+		},
+		{
+			Title = "Notify",
+			Icon = "bell",
+			Callback = function()
+				Window:Notify({
+					Title = "MacLib Modern",
+					Description = "Named Lucide icons are working.",
+					Lifetime = 4,
+				})
+			end,
+		},
+	},
+})
+
+HomeLeft:Code({
+	Language = "Luau",
+	Code = [=[TabGroup:Tab({ Name = "Home", Icon = "house" })
+TabGroup:Tab({ Name = "Custom", Icon = "rbxassetid://18821914323" })]=],
+})
+
+HomeRight:Header({
+	Name = "Discord Community",
+	Icon = "messages-square",
+})
+
+local DiscordBox = HomeRight:AddDiscordBox("NNVNDiscord", {
+	Title = "NNVN Community",
+	Description = "News, support and updates",
+	Invite = "https://discord.gg/n4DbXTyNPj",
+	Icon = "messages-square",
+	ButtonText = "Copy Discord Invite",
+	AutoRefresh = 60,
+})
+
+HomeRight:Button({
+	Name = "Refresh Discord Stats",
+	Icon = "refresh-cw",
+	Callback = function()
+		DiscordBox:Refresh()
+	end,
+})
+
+HomeRight:Button({
+	Name = "Customize Ping Button",
+	Icon = "activity",
+	Callback = function()
+		Window:EditOpenButton({
+			Color = Color3.fromRGB(225, 227, 232),
+			Size = UDim2.fromOffset(128, 36),
+			BounceHeight = 4,
+			PulseSpeed = 1.4,
+			DynamicColor = false,
 		})
 	end,
 })
 
-sections.MainSection1:Input({
-	Name = "Input",
-	Placeholder = "Input",
-	AcceptedCharacters = "All",
-	Callback = function(input)
+AssetLeft:Header({
+	Name = "rbxassetid Test",
+	Icon = "rbxassetid://18821914323",
+})
+
+AssetLeft:Paragraph({
+	Header = "Direct assets still work",
+	Body = "This tab, header and button use rbxassetid:// directly. You can mix asset images and Lucide names in the same window.",
+})
+
+AssetLeft:Button({
+	Name = "Asset Icon Button",
+	Icon = "rbxassetid://18821914323",
+	Callback = function()
 		Window:Notify({
-			Title = Window.Settings.Title,
-			Description = "Successfully set input to " .. input
+			Title = "Asset icon works",
+			Description = "Direct Roblox image assets remain supported.",
+			Lifetime = 4,
 		})
 	end,
-	onChanged = function(input)
-		print("Input is now " .. input)
-	end,
-}, "Input")
+})
 
-sections.MainSection1:Slider({
-	Name = "Slider",
+AssetRight:Header({
+	Name = "Custom Icon Registry",
+	Icon = "library",
+})
+
+AssetRight:Code({
+	Language = "Luau",
+	Code = [=[MacLib:RegisterIcon("my-logo", "rbxassetid://18821914323")
+Section:Button({ Name = "Custom", Icon = "my-logo" })]=],
+})
+
+MacLib:RegisterIcon("demo-logo", "rbxassetid://18821914323")
+
+AssetRight:Button({
+	Name = "Registered Custom Icon",
+	Icon = "demo-logo",
+	Callback = function()
+		print("Registered icon works")
+	end,
+})
+
+ComponentsLeft:Header({
+	Name = "Standard Controls",
+	Icon = "sliders-horizontal",
+})
+
+ComponentsLeft:Toggle({
+	Name = "Example Toggle",
+	Default = false,
+	Callback = function(value)
+		print("Toggle:", value)
+	end,
+})
+
+ComponentsLeft:Slider({
+	Name = "Example Slider",
+	Minimum = 0,
+	Maximum = 100,
 	Default = 50,
-	Minimum = 0,
-	Maximum = 100,
-	DisplayMethod = "Percent",
-	Precision = 0,
-	Callback = function(Value)
-		print("Changed to ".. Value)
-	end
-}, "Slider")
-
-sections.MainSection1:Slider({
-	Name = "Slider with a longer descriptive name",
-	Default = 25,
-	Minimum = 0,
-	Maximum = 100,
-	DisplayMethod = "Percent",
-	Precision = 0,
-	Callback = function(Value)
-		print("Changed to ".. Value)
-	end
-}, "LongNameSlider")
-
-sections.MainSection1:Toggle({
-	Name = "Toggle",
-	Default = false,
-	Tooltip = "Toggle the demo feature on or off", -- hover the row to see the tooltip
 	Callback = function(value)
-		Window:Notify({
-			Title = Window.Settings.Title,
-			Description = (value and "Enabled " or "Disabled ") .. "Toggle"
-		})
+		print("Slider:", value)
 	end,
-	Submenu = function(sub)
-		sub:Dropdown({
-			Name = "Submenu Option",
-			Options = { "Option A", "Option B", "Option C" },
-			Default = 1,
-			Callback = function(value)
-				print("Submenu selected:", value)
-			end,
-		})
-		sub:Slider({
-			Name = "Intensity",
-			Default = 50,
-			Minimum = 0,
-			Maximum = 100,
-			DisplayMethod = "Percent",
-			Precision = 0,
-			Callback = function(value)
-				print("Submenu intensity:", value)
-			end,
-		})
-		sub:Input({
-			Name = "Label",
-			Placeholder = "Type here...",
-			AcceptedCharacters = "All",
-			Callback = function(text)
-				print("Submenu input:", text)
-			end,
-		})
-	end,
-}, "Toggle")
+})
 
-sections.MainSection1:Toggle({
-	Name = "Auto Normalize Shiny",
-	Default = false,
-	Callback = function(value)
-		Window:Notify({
-			Title = Window.Settings.Title,
-			Description = (value and "Enabled " or "Disabled ") .. "Auto Normalize"
-		})
-	end,
-	SideMenuSide = "Left", -- which window edge the drawer slides out of: "Left" or "Right" (default "Left")
-	SideMenu = function(side)
-		side:Dropdown({
-			Name = "Target Ball",
-			Options = { "Poke Ball", "Great Ball", "Ultra Ball" },
-			Default = 1,
-			Callback = function(value)
-				print("SideMenu ball:", value)
-			end,
-		})
-		side:Slider({
-			Name = "Threshold",
-			Default = 75,
-			Minimum = 0,
-			Maximum = 100,
-			DisplayMethod = "Percent",
-			Precision = 0,
-			Callback = function(value)
-				print("SideMenu threshold:", value)
-			end,
-		})
-		side:Input({
-			Name = "Webhook",
-			Placeholder = "https://...",
-			AcceptedCharacters = "All",
-			Callback = function(text)
-				print("SideMenu webhook:", text)
-			end,
-		})
-	end,
-}, "AutoNormalizeShiny")
-
-sections.MainSection1:Keybind({
-	Name = "Keybind",
-	Blacklist = false,
-	Callback = function(binded)
-		Window:Notify({
-			Title = "Demo Window",
-			Description = "Pressed keybind - "..tostring(binded.Name),
-			Lifetime = 3
-		})
-	end,
-	onBinded = function(bind)
-		Window:Notify({
-			Title = "Demo Window",
-			Description = "Successfully Binded Keybind to - "..tostring(bind.Name),
-			Lifetime = 3
-		})
-	end,
-}, "Keybind")
-
-sections.MainSection1:Colorpicker({
-	Name = "Colorpicker",
-	Default = Color3.fromRGB(0, 255, 255),
-	Callback = function(color)
-		print("Color: ", color)
-	end,
-}, "Colorpicker")
-
-sections.MainSection1:Colorpicker({
-	Name = "Accent Color",
-	Default = Window:GetAccent(),
-	Callback = function(color)
-		Window:SetAccent(color)
-	end,
-}, "AccentColor")
-
-local alphaColorPicker = sections.MainSection1:Colorpicker({
-	Name = "Transparency Colorpicker",
-	Default = Color3.fromRGB(255,0,0),
-	Alpha = 0,
-	Callback = function(color, alpha)
-		print("Color: ", color, " Alpha: ", alpha)
-	end,
-}, "TransparencyColorpicker")
-
-local rainbowActive
-local rainbowConnection
-local hue = 0
-
-sections.MainSection1:Toggle({
-	Name = "Rainbow",
-	Default = false,
-	Callback = function(value)
-		rainbowActive = value
-
-		if rainbowActive then
-			rainbowConnection = game:GetService("RunService").RenderStepped:Connect(function(deltaTime)
-				hue = (hue + deltaTime * 0.1) % 1
-				alphaColorPicker:SetColor(Color3.fromHSV(hue, 1, 1))
-			end)
-		elseif rainbowConnection then
-			rainbowConnection:Disconnect()
-			rainbowConnection = nil
-		end
-	end,
-}, "RainbowToggle")
-
-local optionTable = {
-	"Apple",
-	"Banana",
-	"Orange",
-	"Grapes",
-	"Pineapple",
-	"Mango",
-	"Strawberry",
-	"Blueberry",
-	"Watermelon",
-	"Peach"
-}
-
-local Dropdown = sections.MainSection1:Dropdown({
-	Name = "Dropdown",
+ComponentsLeft:Dropdown({
+	Name = "Searchable Dropdown",
+	Options = { "Beginning Isle", "Bamboo Isle", "Sovereign Isle", "Weather Isle" },
 	Search = true,
-	Multi = false,
-	Required = true,
-	Options = optionTable,
 	Default = 1,
-	Callback = function(Value)
-		print("Dropdown changed: ".. Value)
-	end,
-}, "Dropdown")
-
-local MultiDropdown = sections.MainSection1:Dropdown({
-	Name = "Multi Dropdown",
-	Search = true,
-	Multi = true,
-	Required = false,
-	Options = optionTable,
-	Default = {"Apple", "Orange"},
-	Callback = function(Value)
-		local Values = {}
-		for Value, State in next, Value do
-			table.insert(Values, Value)
-		end
-		print("Mutlidropdown changed:", table.concat(Values, ", "))
-	end,
-}, "MultiDropdown")
-
-sections.MainSection1:Button({
-	Name = "Update Selection",
-	Callback = function()
-		Dropdown:UpdateSelection("Grapes")
-		MultiDropdown:UpdateSelection({"Banana", "Pineapple"})
+	Callback = function(value)
+		print("Dropdown:", value)
 	end,
 })
 
-sections.MainSection1:Divider()
-
-sections.MainSection1:Header({
-	Text = "Header #2"
+ComponentsRight:Header({
+	Name = "Icon Formats",
+	Icon = "image",
 })
 
-sections.MainSection1:Paragraph({
-	Header = "Paragraph",
-	Body = "Paragraph body. Lorem ipsum odor amet, consectetuer adipiscing elit. Morbi tempus netus aliquet per velit est gravida."
+ComponentsRight:Paragraph({
+	Header = "Supported values",
+	Body = "Lucide name, lucide:name, rbxassetid://, rbxasset://, HTTP image URL, rbxthumb://, numeric asset ID and registered custom icons.",
 })
 
-sections.MainSection1:Label({
-	Text = "Label. Lorem ipsum odor amet, consectetuer adipiscing elit."
+ComponentsRight:Button({
+	Name = "Lucide Name",
+	Icon = "wand-sparkles",
+	Callback = function() print("Lucide icon") end,
 })
 
-sections.MainSection1:SubLabel({
-	Text = "Sub-Label. Lorem ipsum odor amet, consectetuer adipiscing elit."
+ComponentsRight:Button({
+	Name = "Lucide Prefix",
+	Icon = "lucide:badge-check",
+	Callback = function() print("Prefixed Lucide icon") end,
 })
 
-MacLib:SetFolder("Maclib")
-tabs.Settings:InsertConfigSection("Left")
+ComponentsRight:Button({
+	Name = "Numeric Asset ID",
+	Icon = 18821914323,
+	Callback = function() print("Numeric asset icon") end,
+})
 
-Window.onUnloaded(function()
-	print("Unloaded!")
-end)
+Window:Notify({
+	Title = "Example loaded",
+	Description = "Test the Named Icon, Asset Icon and Components tabs.",
+	Lifetime = 5,
+})
 
-tabs.Main:Select()
-MacLib:LoadAutoLoadConfig()
+-- AutoSelect already opens the first tab. This also demonstrates the manual API.
+Window:Select(HomeTab)
