@@ -3656,36 +3656,48 @@ function MacLib:Window(Settings)
 					
 					local search = Instance.new("Frame")
 					search.Name = "Search"
-					search.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					search.BackgroundTransparency = 0.95
+					search.BackgroundColor3 = Color3.fromRGB(18, 19, 23)
+					search.BackgroundTransparency = 0.18
 					search.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					search.BorderSizePixel = 0
 					search.LayoutOrder = -1
-					search.Size = UDim2.new(1, 0, 0, 30)
+					search.Size = UDim2.new(1, 0, 0, 36)
 					search.Parent = dropdownFrame
-					search.Visible = Settings.Search ~= false
+					-- Search is part of every dropdown, including controls created
+					-- directly through the native API instead of the compat wrapper.
+					search.Visible = true
 
 					local sectionUICorner = Instance.new("UICorner")
 					sectionUICorner.Name = "SectionUICorner"
-					sectionUICorner.CornerRadius = UDim.new(0, 4)
+					sectionUICorner.CornerRadius = UDim.new(0, 8)
 					sectionUICorner.Parent = search
+
+					local searchStroke = Instance.new("UIStroke")
+					searchStroke.Name = "SearchStroke"
+					searchStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+					searchStroke.Color = Color3.fromRGB(255, 255, 255)
+					searchStroke.Transparency = 0.84
+					searchStroke.Thickness = 1
+					searchStroke.Parent = search
 
 					local searchIcon = Instance.new("ImageLabel")
 					searchIcon.Name = "SearchIcon"
 					searchIcon.Image = assets.searchIcon
-					searchIcon.ImageColor3 = Color3.fromRGB(180, 180, 180)
+					searchIcon.ImageColor3 = Color3.fromRGB(235, 237, 242)
+					searchIcon.ImageTransparency = 0.38
 					searchIcon.AnchorPoint = Vector2.new(0, 0.5)
 					searchIcon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					searchIcon.BackgroundTransparency = 1
 					searchIcon.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					searchIcon.BorderSizePixel = 0
 					searchIcon.Position = UDim2.fromScale(0, 0.5)
-					searchIcon.Size = UDim2.fromOffset(12, 12)
+					searchIcon.Size = UDim2.fromOffset(14, 14)
 					searchIcon.Parent = search
 
 					local uIPadding = Instance.new("UIPadding")
 					uIPadding.Name = "UIPadding"
-					uIPadding.PaddingLeft = UDim.new(0, 15)
+					uIPadding.PaddingLeft = UDim.new(0, 12)
+					uIPadding.PaddingRight = UDim.new(0, 12)
 					uIPadding.Parent = search
 
 					local searchBox = Instance.new("TextBox")
@@ -3696,11 +3708,12 @@ function MacLib:Window(Settings)
 						Enum.FontWeight.Medium,
 						Enum.FontStyle.Normal
 					)
-					searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-					searchBox.PlaceholderText = "Search..."
+					searchBox.ClearTextOnFocus = false
+					searchBox.PlaceholderColor3 = Color3.fromRGB(155, 158, 168)
+					searchBox.PlaceholderText = "Search options..."
 					searchBox.Text = ""
-					searchBox.TextColor3 = Color3.fromRGB(200, 200, 200)
-					searchBox.TextSize = 14
+					searchBox.TextColor3 = Color3.fromRGB(238, 240, 245)
+					searchBox.TextSize = 13
 					searchBox.TextXAlignment = Enum.TextXAlignment.Left
 					searchBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					searchBox.BackgroundTransparency = 1
@@ -3744,10 +3757,21 @@ function MacLib:Window(Settings)
 
 					local uIPadding1 = Instance.new("UIPadding")
 					uIPadding1.Name = "UIPadding"
-					uIPadding1.PaddingLeft = UDim.new(0, 23)
+					uIPadding1.PaddingLeft = UDim.new(0, 24)
 					uIPadding1.Parent = searchBox
 
 					searchBox.Parent = search
+
+					searchBox.Focused:Connect(function()
+						Tween(searchStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+							Transparency = 0.58,
+						}):Play()
+					end)
+					searchBox.FocusLost:Connect(function()
+						Tween(searchStroke, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
+							Transparency = 0.84,
+						}):Play()
+					end)
 					
 					local tweensettings = {
 						duration = 0.2,
