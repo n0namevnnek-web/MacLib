@@ -12,6 +12,7 @@ local HttpService = game:GetService("HttpService")
 local ContentProvider = game:GetService("ContentProvider")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local Stats = game:GetService("Stats")
 
 --// Variables
 local isStudio = RunService:IsStudio()
@@ -113,6 +114,10 @@ function MacLib:Window(Settings)
 	local WindowFunctions = {}
 	WindowFunctions.Settings = Settings
 	local searchRegistry = {}
+	local windowTabs = {}
+	local autoSelectTabs = Settings.AutoSelect ~= false
+	currentTabInstance = nil
+	tabIndex = 0
 
 	--// Shared accent color (search highlight, input focus, etc.). registerAccent is
 	--// kept as an extension point for controls that want to live-update with SetAccent.
@@ -6273,11 +6278,27 @@ function MacLib:Window(Settings)
 			end
 
 			tabs[tabSwitcher] = elements1
+			table.insert(windowTabs, TabFunctions)
+			TabFunctions.Index = #windowTabs
+			if #windowTabs == 1 and autoSelectTabs then
+				task.defer(SelectCurrentTab)
+			end
 			return TabFunctions
 		end
 
 		return SectionFunctions
 	end
+
+	function WindowFunctions:Select(TabOrIndex)
+		local target = type(TabOrIndex) == "number" and windowTabs[TabOrIndex] or TabOrIndex
+		if target == nil then target = windowTabs[1] end
+		if type(target) == "table" and type(target.Select) == "function" then
+			target:Select()
+			return target
+		end
+		return nil
+	end
+	WindowFunctions.SelectTab = WindowFunctions.Select
 
 	function WindowFunctions:Notify(Settings)
 		local NotificationFunctions = {}
@@ -6787,7 +6808,14 @@ function MacLib:Window(Settings)
 			playWindowClose()
 		end
 		if openButtonContainer then
-			openButtonContainer.Visible = openButtonEnabled and not State
+			openButtonContainer.Visible = false
+			if not State and openButtonEnabled then
+				task.delay(0.23, function()
+					if openButtonContainer and openButtonContainer.Parent and not windowState then
+						openButtonContainer.Visible = true
+					end
+				end)
+			end
 		end
 	end
 
@@ -6828,10 +6856,11 @@ function MacLib:Window(Settings)
 			if type(openSettings) ~= "table" then openSettings = {} end
 			openButtonEnabled = openSettings.Enabled ~= false
 			local openColor = openSettings.Color or Color3.fromRGB(82, 211, 137)
-			local openButtonSize = openSettings.Size or UDim2.fromOffset(158, 50)
+			local openButtonSize = openSettings.Size or UDim2.fromOffset(112, 66)
 			local bounceHeight = tonumber(openSettings.BounceHeight) or 6
 			local bounceSpeed = math.max(tonumber(openSettings.BounceSpeed) or 1.05, 0.25)
 			local pulseSpeed = math.max(tonumber(openSettings.PulseSpeed) or 1.45, 0.4)
+			local dynamicPingColor = openSettings.DynamicColor ~= false
 
 			openButtonContainer = Instance.new("Frame")
 			openButtonContainer.Name = "OpenButtonContainer"
@@ -6839,7 +6868,7 @@ function MacLib:Window(Settings)
 			openButtonContainer.BackgroundTransparency = 1
 			openButtonContainer.Position = openSettings.Position or UDim2.new(0.5, 0, 1, -26)
 			openButtonContainer.Size = openButtonSize
-			openButtonContainer.Visible = openButtonEnabled and not windowState
+			openButtonContainer.Visible = false
 			openButtonContainer.ZIndex = 250
 			openButtonContainer.Parent = macLib
 
@@ -6902,42 +6931,101 @@ function MacLib:Window(Settings)
 			launcherStroke.Thickness = 1
 			launcherStroke.Parent = launcher
 
-			local launcherIconBack = Instance.new("Frame")
-			launcherIconBack.Name = "IconBack"
-			launcherIconBack.BackgroundColor3 = openColor
-			launcherIconBack.BackgroundTransparency = 0.79
-			launcherIconBack.BorderSizePixel = 0
-			launcherIconBack.Position = UDim2.fromOffset(9, 9)
-			launcherIconBack.Size = UDim2.fromOffset(32, 32)
-			launcherIconBack.ZIndex = 253
-			launcherIconBack.Parent = launcher
-			local launcherIconCorner = Instance.new("UICorner")
-			launcherIconCorner.CornerRadius = UDim.new(1, 0)
-			launcherIconCorner.Parent = launcherIconBack
+			local chart = Instance.new("Frame")
+			chart.Name = "LivePingChart"
+			chart.BackgroundTransparency = 1
+			chart.ClipsDescendants = true
+			chart.Position = UDim2.fromOffset(11, 10)
+			chart.Size = UDim2.new(1, -22, 1, -20)
+			chart.ZIndex = 253
+			chart.Parent = launcher
 
-			local launcherTitle = Instance.new("TextLabel")
-			launcherTitle.Name = "Title"
-			launcherTitle.BackgroundTransparency = 1
-			launcherTitle.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
-			launcherTitle.Position = UDim2.fromOffset(50, 0)
-			launcherTitle.Size = UDim2.new(1, -62, 1, 0)
-			launcherTitle.Text = tostring(openSettings.Title or "Open Menu")
-			launcherTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-			launcherTitle.TextSize = 13
-			launcherTitle.TextTruncate = Enum.TextTruncate.AtEnd
-			launcherTitle.TextXAlignment = Enum.TextXAlignment.Left
-			launcherTitle.ZIndex = 253
-			launcherTitle.Parent = launcher
+			for row = 1, 3 do
+				local grid = Instance.new("Frame")
+				grid.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				grid.BackgroundTransparency = 0.93
+				grid.BorderSizePixel = 0
+				grid.Position = UDim2.fromScale(0, row / 4)
+				grid.Size = UDim2.new(1, 0, 0, 1)
+				grid.ZIndex = 253
+				grid.Parent = chart
+			end
 
-			local launcherIcon = Instance.new("ImageLabel")
-			launcherIcon.Name = "Icon"
-			launcherIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-			launcherIcon.BackgroundTransparency = 1
-			launcherIcon.Position = UDim2.fromScale(0.5, 0.5)
-			launcherIcon.Size = UDim2.fromOffset(17, 17)
-			launcherIcon.ZIndex = 254
-			launcherIcon.Parent = launcherIconBack
-			MacLib:ApplyIcon(launcherIcon, openSettings.Icon or "panel-left-open", openSettings.IconColor or openColor)
+			local sampleCount = 12
+			local pingSamples = table.create(sampleCount, 55)
+			local graphSegments = {}
+			local graphDots = {}
+			for index = 1, sampleCount - 1 do
+				local segment = Instance.new("Frame")
+				segment.Name = "Segment" .. index
+				segment.AnchorPoint = Vector2.new(0.5, 0.5)
+				segment.BackgroundColor3 = openColor
+				segment.BorderSizePixel = 0
+				segment.Size = UDim2.fromOffset(1, 2)
+				segment.ZIndex = 254
+				segment.Parent = chart
+				local segmentCorner = Instance.new("UICorner")
+				segmentCorner.CornerRadius = UDim.new(1, 0)
+				segmentCorner.Parent = segment
+				graphSegments[index] = segment
+			end
+			for index = 1, sampleCount do
+				local dot = Instance.new("Frame")
+				dot.Name = "Point" .. index
+				dot.AnchorPoint = Vector2.new(0.5, 0.5)
+				dot.BackgroundColor3 = openColor
+				dot.BorderSizePixel = 0
+				dot.Size = UDim2.fromOffset(index == sampleCount and 5 or 3, index == sampleCount and 5 or 3)
+				dot.ZIndex = 255
+				dot.Parent = chart
+				local dotCorner = Instance.new("UICorner")
+				dotCorner.CornerRadius = UDim.new(1, 0)
+				dotCorner.Parent = dot
+				graphDots[index] = dot
+			end
+
+			local function getPlayerPing()
+				local ok, value = pcall(function()
+					return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+				end)
+				if ok and tonumber(value) then return math.max(tonumber(value), 0) end
+				local textOk, textValue = pcall(function()
+					return Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
+				end)
+				if textOk then return tonumber(tostring(textValue):match("[%d%.]+")) or 0 end
+				return 0
+			end
+
+			local function colorForPing(ping)
+				if not dynamicPingColor then return openColor end
+				if ping < 120 then return openColor end
+				if ping < 220 then return Color3.fromRGB(239, 190, 75) end
+				return Color3.fromRGB(239, 91, 91)
+			end
+
+			local function renderPingChart(color)
+				local size = chart.AbsoluteSize
+				local width = math.max(size.X, 90)
+				local height = math.max(size.Y, 42)
+				local maxPing = math.max(tonumber(openSettings.MaxPing) or 300, 1)
+				local points = {}
+				for index, ping in ipairs(pingSamples) do
+					local x = (index - 1) / (sampleCount - 1) * width
+					local normalized = math.clamp(ping / maxPing, 0.08, 0.92)
+					local y = height - normalized * height
+					points[index] = Vector2.new(x, y)
+					graphDots[index].Position = UDim2.fromOffset(x, y)
+					graphDots[index].BackgroundColor3 = color
+				end
+				for index, segment in ipairs(graphSegments) do
+					local a, b = points[index], points[index + 1]
+					local delta = b - a
+					segment.Position = UDim2.fromOffset((a.X + b.X) / 2, (a.Y + b.Y) / 2)
+					segment.Size = UDim2.fromOffset(delta.Magnitude + 1, 2)
+					segment.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+					segment.BackgroundColor3 = color
+				end
+			end
 
 			local pinTip = Instance.new("Frame")
 			pinTip.Name = "PinTip"
@@ -6953,6 +7041,22 @@ function MacLib:Window(Settings)
 			local pinTipCorner = Instance.new("UICorner")
 			pinTipCorner.CornerRadius = UDim.new(0, 2)
 			pinTipCorner.Parent = pinTip
+
+			task.spawn(function()
+				while chart.Parent and macLib.Parent do
+					local ping = getPlayerPing()
+					table.remove(pingSamples, 1)
+					table.insert(pingSamples, ping)
+					local pingColor = colorForPing(ping)
+					renderPingChart(pingColor)
+					launcherStroke.Color = pingColor
+					pinTip.BackgroundColor3 = pingColor
+					task.wait(math.max(tonumber(openSettings.UpdateRate) or 0.8, 0.25))
+				end
+			end)
+			chart:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+				renderPingChart(colorForPing(pingSamples[#pingSamples] or 0))
+			end)
 
 			launcher.MouseEnter:Connect(function()
 				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0 }):Play()
@@ -7028,17 +7132,15 @@ function MacLib:Window(Settings)
 
 			function WindowFunctions:EditOpenButton(config)
 				config = config or {}
-				if config.Title ~= nil then launcherTitle.Text = tostring(config.Title) end
-				if config.Icon ~= nil then MacLib:ApplyIcon(launcherIcon, config.Icon, config.IconColor or openColor) end
 				if config.Color ~= nil then
 					openColor = config.Color
 					glow.BackgroundColor3 = openColor
 					pulseRing.BackgroundColor3 = openColor
 					launcherStroke.Color = openColor
-					launcherIconBack.BackgroundColor3 = openColor
 					pinTip.BackgroundColor3 = openColor
-					launcherIcon.ImageColor3 = config.IconColor or openColor
+					renderPingChart(colorForPing(pingSamples[#pingSamples] or 0))
 				end
+				if config.DynamicColor ~= nil then dynamicPingColor = config.DynamicColor == true end
 				if config.Size ~= nil and typeof(config.Size) == "UDim2" then openButtonContainer.Size = config.Size end
 				if config.BounceHeight ~= nil then bounceHeight = math.max(tonumber(config.BounceHeight) or bounceHeight, 0) end
 				if config.BounceSpeed ~= nil then bounceSpeed = math.max(tonumber(config.BounceSpeed) or bounceSpeed, 0.25) end
@@ -7077,8 +7179,18 @@ function MacLib:Window(Settings)
 		return acrylicBlur
 	end
 
+	local anonymous = Settings.Anonymous == true
+		or (type(Settings.User) == "table" and Settings.User.Anonymous == true)
+	local anonymousName = tostring(Settings.AnonymousName
+		or (type(Settings.User) == "table" and Settings.User.Name)
+		or "Anonymous")
+
 	local function _SetUserInfoState(State)
-		if State then
+		if anonymous then
+			headshot.Image = assets.userInfoBlurred
+			username.Text = "@anonymous"
+			displayName.Text = anonymousName
+		elseif State then
 			headshot.Image = (isReady and headshotImage) or "rbxassetid://0"
 			username.Text = "@"..LocalPlayer.Name
 			displayName.Text = LocalPlayer.DisplayName
@@ -7101,10 +7213,19 @@ function MacLib:Window(Settings)
 	_SetUserInfoState(showUserInfo)
 
 	function WindowFunctions:SetUserInfoState(State)
+		showUserInfo = State == true
 		_SetUserInfoState(State)
 	end
 	function WindowFunctions:GetUserInfoState(State)
 		return showUserInfo
+	end
+	function WindowFunctions:SetAnonymous(State, Name)
+		anonymous = State == true
+		if Name ~= nil then anonymousName = tostring(Name) end
+		_SetUserInfoState(showUserInfo)
+	end
+	function WindowFunctions:GetAnonymous()
+		return anonymous
 	end
 	
 	function WindowFunctions:SetSize(Size)
@@ -7131,6 +7252,7 @@ function MacLib:Window(Settings)
 	ContentProvider:PreloadAsync(assetList)
 	macLib.Enabled = true
 	windowState = true
+	if openButtonContainer then openButtonContainer.Visible = false end
 	playWindowOpen()
 
 	return WindowFunctions
@@ -7144,6 +7266,9 @@ function MacLib:Demo()
 		DragStyle = 1,
 		DisabledWindowControls = {},
 		ShowUserInfo = true,
+		Anonymous = true,
+		AnonymousName = "Anonymous User",
+		AutoSelect = true,
 		Keybind = Enum.KeyCode.RightControl,
 		AcrylicBlur = true,
 		Tags = {
@@ -7153,10 +7278,14 @@ function MacLib:Demo()
 		},
 		OpenButton = {
 			Enabled = true,
-			Title = "Open Menu",
-			Icon = "panel-left-open",
+			Color = Color3.fromRGB(82, 211, 137),
+			Size = UDim2.fromOffset(112, 66),
 			Draggable = true,
 			Bobbing = true,
+			BounceHeight = 6,
+			Pulse = true,
+			DynamicColor = true,
+			UpdateRate = 0.8,
 		},
 	})
 
@@ -8013,6 +8142,10 @@ do
 			Accent = settings.Accent,
 			DragStyle = settings.DragStyle,
 			ShowUserInfo = settings.ShowUserInfo,
+			Anonymous = settings.Anonymous,
+			AnonymousName = settings.AnonymousName,
+			User = settings.User,
+			AutoSelect = settings.AutoSelect,
 			AcrylicBlur = settings.AcrylicBlur,
 			DisabledWindowControls = settings.DisabledWindowControls,
 			WindowControls = settings.WindowControls,
