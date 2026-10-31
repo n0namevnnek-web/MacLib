@@ -199,8 +199,13 @@ function MacLib:Window(Settings)
 	local base = Instance.new("Frame")
 	base.Name = "Base"
 	base.AnchorPoint = Vector2.new(0.5, 0.5)
-	base.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-	base.BackgroundTransparency = Settings.AcrylicBlur and 0.05 or 0
+	base.BackgroundColor3 = Settings.BackgroundColor or Color3.fromRGB(15, 15, 15)
+	local configuredBackgroundTransparency = tonumber(Settings.BackgroundTransparency)
+	if configuredBackgroundTransparency == nil then
+		configuredBackgroundTransparency = Settings.Transparent and 0.18 or (Settings.AcrylicBlur and 0.05 or 0)
+	end
+	configuredBackgroundTransparency = math.clamp(configuredBackgroundTransparency, 0, 0.95)
+	base.BackgroundTransparency = configuredBackgroundTransparency
 	base.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
@@ -572,7 +577,7 @@ function MacLib:Window(Settings)
 	informationGroup.BackgroundTransparency = 1
 	informationGroup.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	informationGroup.BorderSizePixel = 0
-	informationGroup.Size = UDim2.new(1, 0, 1, -38)
+	informationGroup.Size = UDim2.fromScale(1, 1)
 
 	local informationGroupUIPadding = Instance.new("UIPadding")
 	informationGroupUIPadding.Name = "InformationGroupUIPadding"
@@ -697,10 +702,12 @@ function MacLib:Window(Settings)
 	tagRail.TopImage = ""
 	tagRail.ScrollBarThickness = 0
 	tagRail.CanvasSize = UDim2.new()
-	tagRail.Position = UDim2.new(0, 15, 1, -35)
-	tagRail.Size = UDim2.new(1, -30, 0, 30)
+	tagRail.AnchorPoint = Vector2.new(1, 0.5)
+	tagRail.Position = UDim2.new(1, -24, 0.5, 0)
+	tagRail.Size = UDim2.fromOffset(96, 30)
 	tagRail.ScrollingDirection = Enum.ScrollingDirection.X
-	tagRail.Parent = userInfo
+	tagRail.Parent = informationHolder
+	titleFrame.Size = UDim2.new(1, -112, 1, 0)
 
 	local tagRailLayout = Instance.new("UIListLayout")
 	tagRailLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -1352,6 +1359,62 @@ function MacLib:Window(Settings)
 	globalSettingsUIScale.Parent = globalSettings
 	globalSettings.Parent = base
 	base.Parent = macLib
+
+	-- Compact resize grip with a larger invisible touch target.
+	local resizeEnabled = Settings.Resizable ~= false
+	local resizeMin = typeof(Settings.MinSize) == "Vector2" and Settings.MinSize or Vector2.new(520, 360)
+	local resizeMax = typeof(Settings.MaxSize) == "Vector2" and Settings.MaxSize or Vector2.new(1200, 820)
+	local resizeHandle = Instance.new("TextButton")
+	resizeHandle.Name = "ResizeHandle"
+	resizeHandle.Text = ""
+	resizeHandle.AutoButtonColor = false
+	resizeHandle.BackgroundTransparency = 1
+	resizeHandle.AnchorPoint = Vector2.new(1, 1)
+	resizeHandle.Position = UDim2.new(1, -4, 1, -4)
+	resizeHandle.Size = UDim2.fromOffset(48, 24)
+	resizeHandle.ZIndex = 250
+	resizeHandle.Visible = resizeEnabled
+	resizeHandle.Parent = base
+
+	local resizeBar = Instance.new("Frame")
+	resizeBar.Name = "Bar"
+	resizeBar.AnchorPoint = Vector2.new(1, 1)
+	resizeBar.Position = UDim2.new(1, -3, 1, -3)
+	resizeBar.Size = UDim2.fromOffset(28, 3)
+	resizeBar.BackgroundColor3 = Color3.fromRGB(245, 246, 249)
+	resizeBar.BackgroundTransparency = 0.18
+	resizeBar.BorderSizePixel = 0
+	resizeBar.ZIndex = 251
+	resizeBar.Parent = resizeHandle
+	local resizeBarCorner = Instance.new("UICorner")
+	resizeBarCorner.CornerRadius = UDim.new(1, 0)
+	resizeBarCorner.Parent = resizeBar
+
+	local resizing = false
+	local resizeInput
+	local resizeStart
+	local resizeStartSize
+	resizeHandle.InputBegan:Connect(function(input)
+		if not resizeEnabled then return end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			resizing = true
+			resizeInput = input
+			resizeStart = input.Position
+			resizeStartSize = base.AbsoluteSize
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then resizing = false end
+			end)
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if not resizing then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+		if resizeInput and resizeInput.UserInputType == Enum.UserInputType.Touch and input ~= resizeInput then return end
+		local delta = input.Position - resizeStart
+		local width = math.clamp(resizeStartSize.X + delta.X, resizeMin.X, resizeMax.X)
+		local height = math.clamp(resizeStartSize.Y + delta.Y, resizeMin.Y, resizeMax.Y)
+		base.Size = UDim2.fromOffset(width, height)
+	end)
 
 	-- Shared hover tooltip (one per window). Parented to the ScreenGui (which ignores
 	-- the Gui inset) so it lives in raw screen space and the window's UIScale never
@@ -7179,7 +7242,7 @@ function MacLib:Window(Settings)
 
 	function WindowFunctions:SetAcrylicBlurState(State)
 		acrylicBlur = State
-		base.BackgroundTransparency = State and 0.05 or 0
+		base.BackgroundTransparency = configuredBackgroundTransparency
 	end
 
 	function WindowFunctions:GetAcrylicBlurState()
@@ -7240,6 +7303,17 @@ function MacLib:Window(Settings)
 	end
 	function WindowFunctions:GetSize(Size)
 		return base.Size
+	end
+	function WindowFunctions:SetResizable(State)
+		resizeEnabled = State == true
+		resizeHandle.Visible = resizeEnabled
+	end
+	function WindowFunctions:GetResizable()
+		return resizeEnabled
+	end
+	function WindowFunctions:SetResizeLimits(Minimum, Maximum)
+		if typeof(Minimum) == "Vector2" then resizeMin = Minimum end
+		if typeof(Maximum) == "Vector2" then resizeMax = Maximum end
 	end
 	
 	function WindowFunctions:SetScale(Scale)
@@ -8313,6 +8387,12 @@ do
 			User = settings.User,
 			AutoSelect = settings.AutoSelect,
 			AcrylicBlur = first(settings.AcrylicBlur, settings.Acrylic, true),
+			Transparent = settings.Transparent == true,
+			BackgroundTransparency = settings.BackgroundTransparency,
+			BackgroundColor = settings.BackgroundColor,
+			Resizable = settings.Resizable,
+			MinSize = settings.MinSize,
+			MaxSize = settings.MaxSize,
 			DisabledWindowControls = settings.DisabledWindowControls,
 			WindowControls = settings.WindowControls,
 			Keybind = first(settings.Keybind, settings.ToggleKey, Enum.KeyCode.RightControl),
