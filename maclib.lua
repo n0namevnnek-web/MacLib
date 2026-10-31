@@ -729,19 +729,19 @@ function MacLib:Window(Settings)
 		pill.AutoButtonColor = false
 		pill.AutomaticSize = Enum.AutomaticSize.X
 		pill.BackgroundColor3 = color
-		pill.BackgroundTransparency = 0.82
+		pill.BackgroundTransparency = TagSettings.BackgroundTransparency or 0.9
 		pill.BorderSizePixel = 0
-		pill.Size = UDim2.fromOffset(0, 27)
+		pill.Size = UDim2.fromOffset(0, 25)
 		pill.Parent = tagRail
 
 		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(1, 0)
+		corner.CornerRadius = TagSettings.CornerRadius or UDim.new(0, tonumber(TagSettings.Radius) or 4)
 		corner.Parent = pill
 
 		local stroke = Instance.new("UIStroke")
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.Color = color
-		stroke.Transparency = 0.45
+		stroke.Transparency = TagSettings.StrokeTransparency or 0.68
 		stroke.Thickness = 1
 		stroke.Parent = pill
 
@@ -760,7 +760,7 @@ function MacLib:Window(Settings)
 		local icon = Instance.new("ImageLabel")
 		icon.Name = "Icon"
 		icon.BackgroundTransparency = 1
-		icon.Size = UDim2.fromOffset(14, 14)
+		icon.Size = UDim2.fromOffset(13, 13)
 		icon.ImageTransparency = 0.08
 		icon.Visible = TagSettings.Icon ~= nil
 		icon.Parent = pill
@@ -779,12 +779,12 @@ function MacLib:Window(Settings)
 		title.Parent = pill
 
 		pill.MouseEnter:Connect(function()
-			Tween(pill, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.68 }):Play()
-			Tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.2 }):Play()
+			Tween(pill, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.82 }):Play()
+			Tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.42 }):Play()
 		end)
 		pill.MouseLeave:Connect(function()
-			Tween(pill, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.82 }):Play()
-			Tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.45 }):Play()
+			Tween(pill, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = TagSettings.BackgroundTransparency or 0.9 }):Play()
+			Tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = TagSettings.StrokeTransparency or 0.68 }):Play()
 		end)
 		pill.MouseButton1Click:Connect(function()
 			if TagSettings.Callback then task.spawn(TagSettings.Callback, TagFunctions) end
