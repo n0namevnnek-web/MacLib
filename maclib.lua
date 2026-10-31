@@ -567,7 +567,7 @@ function MacLib:Window(Settings)
 	informationGroup.BackgroundTransparency = 1
 	informationGroup.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	informationGroup.BorderSizePixel = 0
-	informationGroup.Size = UDim2.new(1, 0, 1, -34)
+	informationGroup.Size = UDim2.new(1, 0, 1, -38)
 
 	local informationGroupUIPadding = Instance.new("UIPadding")
 	informationGroupUIPadding.Name = "InformationGroupUIPadding"
@@ -692,8 +692,8 @@ function MacLib:Window(Settings)
 	tagRail.TopImage = ""
 	tagRail.ScrollBarThickness = 0
 	tagRail.CanvasSize = UDim2.new()
-	tagRail.Position = UDim2.new(0, 15, 1, -31)
-	tagRail.Size = UDim2.new(1, -30, 0, 26)
+	tagRail.Position = UDim2.new(0, 15, 1, -35)
+	tagRail.Size = UDim2.new(1, -30, 0, 30)
 	tagRail.ScrollingDirection = Enum.ScrollingDirection.X
 	tagRail.Parent = userInfo
 
@@ -726,7 +726,7 @@ function MacLib:Window(Settings)
 		pill.BackgroundColor3 = color
 		pill.BackgroundTransparency = 0.82
 		pill.BorderSizePixel = 0
-		pill.Size = UDim2.fromOffset(0, 23)
+		pill.Size = UDim2.fromOffset(0, 27)
 		pill.Parent = tagRail
 
 		local corner = Instance.new("UICorner")
@@ -741,8 +741,8 @@ function MacLib:Window(Settings)
 		stroke.Parent = pill
 
 		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 8)
-		padding.PaddingRight = UDim.new(0, 8)
+		padding.PaddingLeft = UDim.new(0, 9)
+		padding.PaddingRight = UDim.new(0, 9)
 		padding.Parent = pill
 
 		local layout = Instance.new("UIListLayout")
@@ -755,7 +755,7 @@ function MacLib:Window(Settings)
 		local icon = Instance.new("ImageLabel")
 		icon.Name = "Icon"
 		icon.BackgroundTransparency = 1
-		icon.Size = UDim2.fromOffset(12, 12)
+		icon.Size = UDim2.fromOffset(14, 14)
 		icon.ImageTransparency = 0.08
 		icon.Visible = TagSettings.Icon ~= nil
 		icon.Parent = pill
@@ -769,7 +769,7 @@ function MacLib:Window(Settings)
 		title.Size = UDim2.fromOffset(0, 16)
 		title.Text = tostring(TagSettings.Title or "TAG")
 		title.TextColor3 = Color3.fromRGB(245, 245, 245)
-		title.TextSize = 10
+		title.TextSize = 11
 		title.TextTransparency = 0.08
 		title.Parent = pill
 
@@ -2836,6 +2836,15 @@ function MacLib:Window(Settings)
 				end
 
 				function SectionFunctions:Slider(Settings)
+					Settings = Settings or {}
+					Settings.Minimum = tonumber(Settings.Minimum or Settings.Min) or 0
+					Settings.Maximum = tonumber(Settings.Maximum or Settings.Max) or 100
+					if Settings.Maximum < Settings.Minimum then
+						Settings.Minimum, Settings.Maximum = Settings.Maximum, Settings.Minimum
+					end
+					Settings.Default = tonumber(Settings.Default or Settings.Value) or Settings.Minimum
+					Settings.Default = math.clamp(Settings.Default, Settings.Minimum, Settings.Maximum)
+					Settings.DisplayMethod = Settings.DisplayMethod or "Value"
 					local SliderFunctions = {}
 					local slider = Instance.new("Frame")
 					slider.Name = "Slider"
@@ -2992,7 +3001,8 @@ function MacLib:Window(Settings)
 							return tostring(math.round(sliderValue)) .. "°"
 						end,
 						Percent = function(sliderValue)
-							local percentage = (sliderValue - Settings.Minimum) / (Settings.Maximum - Settings.Minimum) * 100
+							local range = Settings.Maximum - Settings.Minimum
+							local percentage = range == 0 and 0 or (sliderValue - Settings.Minimum) / range * 100
 							return tostring(math.round(percentage)) .. "%"
 						end,
 						Value = function(sliderValue)
@@ -3000,24 +3010,31 @@ function MacLib:Window(Settings)
 						end
 					}
 
-					local ValueDisplayMethod = DisplayMethods[Settings.DisplayMethod]
+					-- DisplayMethod used to be mandatory. Keep old values working while
+					-- defaulting safely for examples and compatibility wrappers.
+					local ValueDisplayMethod = DisplayMethods[Settings.DisplayMethod or "Value"] or DisplayMethods.Value
 					local finalValue
 
 					local function SetValue(val, ignorecallback)
 						local posXScale
+						local minimum = tonumber(Settings.Minimum) or 0
+						local maximum = tonumber(Settings.Maximum) or 100
+						if maximum < minimum then minimum, maximum = maximum, minimum end
+						local range = maximum - minimum
 
 						if typeof(val) == "Instance" then
 							local input = val
-							posXScale = math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X, 0, 1)
+							local width = math.max(sliderBar.AbsoluteSize.X, 1)
+							posXScale = math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / width, 0, 1)
 						else
-							local value = val
-							posXScale = (value - Settings.Minimum) / (Settings.Maximum - Settings.Minimum)
+							local value = math.clamp(tonumber(val) or minimum, minimum, maximum)
+							posXScale = range == 0 and 0 or math.clamp((value - minimum) / range, 0, 1)
 						end
 
 						local pos = UDim2.new(posXScale, 0, 0.5, 0)
 						sliderHead.Position = pos
 
-						finalValue = posXScale * (Settings.Maximum - Settings.Minimum) + Settings.Minimum
+						finalValue = posXScale * range + minimum
 						sliderValue.Text = ValueDisplayMethod(finalValue)
 
 						if not ignorecallback then
@@ -3031,7 +3048,7 @@ function MacLib:Window(Settings)
 						SliderFunctions.Value = finalValue
 					end
 
-					SetValue(Settings.Default, true)
+					SetValue(Settings.Default ~= nil and Settings.Default or Settings.Minimum or 0, true)
 
 					sliderHead.InputBegan:Connect(function(input)
 						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -3061,7 +3078,7 @@ function MacLib:Window(Settings)
 							local newValue = math.clamp(value, Settings.Minimum, Settings.Maximum)
 							SetValue(newValue)
 						else
-							sliderValue.Text = ValueDisplayMethod(sliderValue)
+							sliderValue.Text = ValueDisplayMethod(finalValue or Settings.Default or Settings.Minimum or 0)
 						end
 					end)
 
@@ -3086,7 +3103,7 @@ function MacLib:Window(Settings)
 					section:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateSliderBarSize)
 
 					function SliderFunctions:UpdateName(Name)
-						sliderName = Name
+						sliderName.Text = tostring(Name or "")
 					end
 					function SliderFunctions:SetVisibility(State)
 						slider.Visible = State
