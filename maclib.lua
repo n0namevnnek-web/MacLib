@@ -1,3 +1,8 @@
+--[[
+!! OUTDATED REPOSITORY !! Please use the new repository:
+https://github.com/biggaboy212/Maclib/tree/main
+]]
+
 local MacLib = {}
 
 --// Services
@@ -191,13 +196,105 @@ function MacLib:Window(Settings)
 	notificationsUIPadding.PaddingTop = UDim.new(0, 10)
 	notificationsUIPadding.Parent = notifications
 
+	local notificationHistoryEnabled = Settings.NotificationHistoryEnabled ~= false
+	local notificationHistoryLimit = math.max(10, tonumber(Settings.NotificationHistoryLimit) or 60)
+	local notificationHistory = {}
+	local notificationHistoryList
+	local notificationHistoryPanel
+	local notificationHistoryButton
+
+	local function notificationClockText()
+		local ok, value = pcall(function()
+			return DateTime.now():FormatLocalTime("HH:mm:ss", "en-us")
+		end)
+		return ok and value or os.date("%H:%M:%S")
+	end
+
+	local function rebuildNotificationHistory()
+		if not notificationHistoryList then return end
+		for _, child in ipairs(notificationHistoryList:GetChildren()) do
+			if child:IsA("GuiObject") then child:Destroy() end
+		end
+		for index = #notificationHistory, 1, -1 do
+			local entry = notificationHistory[index]
+			local card = Instance.new("Frame")
+			card.Name = "HistoryEntry"
+			card.AutomaticSize = Enum.AutomaticSize.Y
+			card.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			card.BackgroundTransparency = 0.94
+			card.BorderSizePixel = 0
+			card.Size = UDim2.new(1, 0, 0, 54)
+			card.ZIndex = 302
+			card.Parent = notificationHistoryList
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 6)
+			corner.Parent = card
+
+			local heading = Instance.new("TextLabel")
+			heading.BackgroundTransparency = 1
+			heading.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+			heading.Position = UDim2.fromOffset(9, 7)
+			heading.Size = UDim2.new(1, -82, 0, 17)
+			heading.Text = entry.Title
+			heading.TextColor3 = Color3.fromRGB(242, 243, 246)
+			heading.TextSize = 12
+			heading.TextTruncate = Enum.TextTruncate.AtEnd
+			heading.TextXAlignment = Enum.TextXAlignment.Left
+			heading.ZIndex = 303
+			heading.Parent = card
+
+			local time = Instance.new("TextLabel")
+			time.AnchorPoint = Vector2.new(1, 0)
+			time.BackgroundTransparency = 1
+			time.FontFace = Font.new(assets.interFont)
+			time.Position = UDim2.new(1, -9, 0, 7)
+			time.Size = UDim2.fromOffset(64, 17)
+			time.Text = entry.Time
+			time.TextColor3 = Color3.fromRGB(225, 227, 232)
+			time.TextSize = 10
+			time.TextTransparency = 0.38
+			time.TextXAlignment = Enum.TextXAlignment.Right
+			time.ZIndex = 303
+			time.Parent = card
+
+			local body = Instance.new("TextLabel")
+			body.AutomaticSize = Enum.AutomaticSize.Y
+			body.BackgroundTransparency = 1
+			body.FontFace = Font.new(assets.interFont)
+			body.Position = UDim2.fromOffset(9, 28)
+			body.Size = UDim2.new(1, -18, 0, 16)
+			body.Text = entry.Description
+			body.TextColor3 = Color3.fromRGB(225, 227, 232)
+			body.TextSize = 10
+			body.TextTransparency = 0.48
+			body.TextTruncate = Enum.TextTruncate.AtEnd
+			body.TextXAlignment = Enum.TextXAlignment.Left
+			body.ZIndex = 303
+			body.Parent = card
+		end
+	end
+
+	local function recordNotification(settings)
+		local sentAt = notificationClockText()
+		if notificationHistoryEnabled and not settings.SkipHistory then
+			table.insert(notificationHistory, {
+				Title = tostring(settings.Title or "Notification"),
+				Description = tostring(settings.Description or settings.Content or ""),
+				Time = sentAt,
+			})
+			while #notificationHistory > notificationHistoryLimit do table.remove(notificationHistory, 1) end
+			rebuildNotificationHistory()
+		end
+		return sentAt
+	end
+
 	local base = Instance.new("Frame")
 	base.Name = "Base"
 	base.AnchorPoint = Vector2.new(0.5, 0.5)
 	base.BackgroundColor3 = Settings.BackgroundColor or Color3.fromRGB(15, 15, 15)
 	local configuredBackgroundTransparency = tonumber(Settings.BackgroundTransparency)
 	if configuredBackgroundTransparency == nil then
-		configuredBackgroundTransparency = Settings.Transparent and 0.18 or (Settings.AcrylicBlur and 0.05 or 0)
+		configuredBackgroundTransparency = Settings.Transparent and 0.1 or (Settings.AcrylicBlur and 0.05 or 0)
 	end
 	configuredBackgroundTransparency = math.clamp(configuredBackgroundTransparency, 0, 0.95)
 	base.BackgroundTransparency = configuredBackgroundTransparency
@@ -284,7 +381,7 @@ function MacLib:Window(Settings)
 
 	local uIListLayout = Instance.new("UIListLayout")
 	uIListLayout.Name = "UIListLayout"
-	uIListLayout.Padding = UDim.new(0, 5)
+	uIListLayout.Padding = UDim.new(0, 9)
 	uIListLayout.FillDirection = Enum.FillDirection.Horizontal
 	uIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	uIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
@@ -296,7 +393,7 @@ function MacLib:Window(Settings)
 	uIPadding.Parent = controls
 	
 	local windowControlSettings = {
-		sizes = { enabled = UDim2.fromOffset(8, 8), disabled = UDim2.fromOffset(7, 7) },
+		sizes = { enabled = UDim2.fromOffset(12, 12), disabled = UDim2.fromOffset(10, 10) },
 		transparencies = { enabled = 0, disabled = 1 },
 		strokeTransparency = 0.9,
 	}
@@ -709,11 +806,11 @@ function MacLib:Window(Settings)
 		-- the right for the globe/settings button.
 		local contentWidth = math.max(0, informationHolder.AbsoluteSize.X - 45)
 		local wantedX = math.max(0, math.ceil(title.TextBounds.X) + 8)
-		local maxX = math.max(0, contentWidth - 74)
+		local maxX = math.max(0, contentWidth - 106)
 		local x = math.min(wantedX, maxX)
-		local width = math.clamp(contentWidth - x - 21, 52, 96)
-		tagRail.Position = UDim2.fromOffset(x, 1)
-		tagRail.Size = UDim2.fromOffset(width, 27)
+		local width = math.clamp(contentWidth - x - 42, 62, 84)
+		tagRail.Position = UDim2.fromOffset(x, 2)
+		tagRail.Size = UDim2.fromOffset(width + 2, 24)
 	end
 	title:GetPropertyChangedSignal("TextBounds"):Connect(updateHeaderTagLayout)
 	informationHolder:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateHeaderTagLayout)
@@ -725,6 +822,10 @@ function MacLib:Window(Settings)
 	tagRailLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	tagRailLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 	tagRailLayout.Parent = tagRail
+	local tagRailPadding = Instance.new("UIPadding")
+	tagRailPadding.PaddingLeft = UDim.new(0, 1)
+	tagRailPadding.PaddingRight = UDim.new(0, 3)
+	tagRailPadding.Parent = tagRail
 
 	tagRail.InputChanged:Connect(function(input)
 		if input.UserInputType ~= Enum.UserInputType.MouseWheel then return end
@@ -748,7 +849,7 @@ function MacLib:Window(Settings)
 		pill.BackgroundColor3 = color
 		pill.BackgroundTransparency = TagSettings.BackgroundTransparency or 0.9
 		pill.BorderSizePixel = 0
-		pill.Size = UDim2.fromOffset(0, 25)
+		pill.Size = UDim2.fromOffset(0, 21)
 		pill.Parent = tagRail
 
 		local corner = Instance.new("UICorner")
@@ -763,13 +864,13 @@ function MacLib:Window(Settings)
 		stroke.Parent = pill
 
 		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 9)
-		padding.PaddingRight = UDim.new(0, 9)
+		padding.PaddingLeft = UDim.new(0, 7)
+		padding.PaddingRight = UDim.new(0, 7)
 		padding.Parent = pill
 
 		local layout = Instance.new("UIListLayout")
 		layout.FillDirection = Enum.FillDirection.Horizontal
-		layout.Padding = UDim.new(0, 5)
+		layout.Padding = UDim.new(0, 4)
 		layout.SortOrder = Enum.SortOrder.LayoutOrder
 		layout.VerticalAlignment = Enum.VerticalAlignment.Center
 		layout.Parent = pill
@@ -777,7 +878,7 @@ function MacLib:Window(Settings)
 		local icon = Instance.new("ImageLabel")
 		icon.Name = "Icon"
 		icon.BackgroundTransparency = 1
-		icon.Size = UDim2.fromOffset(13, 13)
+		icon.Size = UDim2.fromOffset(11, 11)
 		icon.ImageTransparency = 0.08
 		icon.Visible = TagSettings.Icon ~= nil
 		icon.Parent = pill
@@ -788,10 +889,10 @@ function MacLib:Window(Settings)
 		title.AutomaticSize = Enum.AutomaticSize.X
 		title.BackgroundTransparency = 1
 		title.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
-		title.Size = UDim2.fromOffset(0, 16)
+		title.Size = UDim2.fromOffset(0, 14)
 		title.Text = tostring(TagSettings.Title or "TAG")
 		title.TextColor3 = Color3.fromRGB(245, 245, 245)
-		title.TextSize = 11
+		title.TextSize = 10
 		title.TextTransparency = 0.08
 		title.Parent = pill
 
@@ -1369,6 +1470,112 @@ function MacLib:Window(Settings)
 	globalSettingsUIScale.Parent = globalSettings
 	globalSettings.Parent = base
 	base.Parent = macLib
+
+	-- Native notification history: bell button, local timestamps and a compact
+	-- scrollable panel. It is library-owned and requires no hub-side section.
+	notificationHistoryButton = Instance.new("ImageButton")
+	notificationHistoryButton.Name = "NotificationHistoryButton"
+	notificationHistoryButton.AnchorPoint = Vector2.new(1, 0.5)
+	notificationHistoryButton.Position = UDim2.new(1, -23, 0.5, 0)
+	notificationHistoryButton.Size = UDim2.fromOffset(15, 15)
+	notificationHistoryButton.BackgroundTransparency = 1
+	notificationHistoryButton.BorderSizePixel = 0
+	notificationHistoryButton.AutoButtonColor = false
+	notificationHistoryButton.ImageTransparency = 0.35
+	notificationHistoryButton.Visible = notificationHistoryEnabled
+	notificationHistoryButton.Parent = informationHolder
+	MacLib:ApplyIcon(notificationHistoryButton, "bell", Color3.fromRGB(225, 227, 232))
+
+	notificationHistoryPanel = Instance.new("Frame")
+	notificationHistoryPanel.Name = "NotificationHistory"
+	notificationHistoryPanel.AnchorPoint = Vector2.new(1, 0)
+	notificationHistoryPanel.Position = UDim2.new(1, -14, 0, 44)
+	notificationHistoryPanel.Size = UDim2.fromOffset(300, 330)
+	notificationHistoryPanel.BackgroundColor3 = Color3.fromRGB(16, 17, 20)
+	notificationHistoryPanel.BackgroundTransparency = 0.04
+	notificationHistoryPanel.BorderSizePixel = 0
+	notificationHistoryPanel.Visible = false
+	notificationHistoryPanel.ZIndex = 300
+	notificationHistoryPanel.Parent = base
+	local historyCorner = Instance.new("UICorner")
+	historyCorner.CornerRadius = UDim.new(0, 8)
+	historyCorner.Parent = notificationHistoryPanel
+	local historyStroke = Instance.new("UIStroke")
+	historyStroke.Color = Color3.fromRGB(225, 227, 232)
+	historyStroke.Transparency = 0.84
+	historyStroke.Parent = notificationHistoryPanel
+
+	local historyTitle = Instance.new("TextLabel")
+	historyTitle.BackgroundTransparency = 1
+	historyTitle.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+	historyTitle.Position = UDim2.fromOffset(13, 10)
+	historyTitle.Size = UDim2.new(1, -90, 0, 22)
+	historyTitle.Text = "Notification History"
+	historyTitle.TextColor3 = Color3.fromRGB(245, 246, 249)
+	historyTitle.TextSize = 13
+	historyTitle.TextXAlignment = Enum.TextXAlignment.Left
+	historyTitle.ZIndex = 301
+	historyTitle.Parent = notificationHistoryPanel
+
+	local historyClear = Instance.new("TextButton")
+	historyClear.AnchorPoint = Vector2.new(1, 0)
+	historyClear.Position = UDim2.new(1, -38, 0, 9)
+	historyClear.Size = UDim2.fromOffset(46, 24)
+	historyClear.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	historyClear.BackgroundTransparency = 0.94
+	historyClear.BorderSizePixel = 0
+	historyClear.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+	historyClear.Text = "Clear"
+	historyClear.TextColor3 = Color3.fromRGB(225, 227, 232)
+	historyClear.TextSize = 10
+	historyClear.ZIndex = 301
+	historyClear.Parent = notificationHistoryPanel
+	local historyClearCorner = Instance.new("UICorner")
+	historyClearCorner.CornerRadius = UDim.new(0, 5)
+	historyClearCorner.Parent = historyClear
+
+	local historyClose = Instance.new("TextButton")
+	historyClose.AnchorPoint = Vector2.new(1, 0)
+	historyClose.Position = UDim2.new(1, -9, 0, 9)
+	historyClose.Size = UDim2.fromOffset(24, 24)
+	historyClose.BackgroundTransparency = 1
+	historyClose.BorderSizePixel = 0
+	historyClose.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+	historyClose.Text = "×"
+	historyClose.TextColor3 = Color3.fromRGB(225, 227, 232)
+	historyClose.TextSize = 17
+	historyClose.ZIndex = 301
+	historyClose.Parent = notificationHistoryPanel
+
+	notificationHistoryList = Instance.new("ScrollingFrame")
+	notificationHistoryList.Name = "HistoryList"
+	notificationHistoryList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	notificationHistoryList.BackgroundTransparency = 1
+	notificationHistoryList.BorderSizePixel = 0
+	notificationHistoryList.CanvasSize = UDim2.new()
+	notificationHistoryList.Position = UDim2.fromOffset(11, 43)
+	notificationHistoryList.Size = UDim2.new(1, -22, 1, -54)
+	notificationHistoryList.ScrollBarThickness = 2
+	notificationHistoryList.ScrollBarImageColor3 = Color3.fromRGB(180, 184, 194)
+	notificationHistoryList.ZIndex = 301
+	notificationHistoryList.Parent = notificationHistoryPanel
+	local historyListLayout = Instance.new("UIListLayout")
+	historyListLayout.Padding = UDim.new(0, 7)
+	historyListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	historyListLayout.Parent = notificationHistoryList
+	local historyListPadding = Instance.new("UIPadding")
+	historyListPadding.PaddingBottom = UDim.new(0, 8)
+	historyListPadding.Parent = notificationHistoryList
+
+	notificationHistoryButton.MouseButton1Click:Connect(function()
+		notificationHistoryPanel.Visible = not notificationHistoryPanel.Visible
+		if notificationHistoryPanel.Visible then rebuildNotificationHistory() end
+	end)
+	historyClose.MouseButton1Click:Connect(function() notificationHistoryPanel.Visible = false end)
+	historyClear.MouseButton1Click:Connect(function()
+		table.clear(notificationHistory)
+		rebuildNotificationHistory()
+	end)
 
 	-- Compact resize grip with a larger invisible touch target.
 	local resizeEnabled = Settings.Resizable ~= false
@@ -2151,7 +2358,7 @@ function MacLib:Window(Settings)
 					section.Name = "Section"
 					section.AutomaticSize = Enum.AutomaticSize.Y
 					section.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					section.BackgroundTransparency = 0.98
+					section.BackgroundTransparency = 0.92
 					section.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					section.BorderSizePixel = 0
 					section.Position = UDim2.fromScale(0, 6.78e-08)
@@ -2364,23 +2571,26 @@ function MacLib:Window(Settings)
 
 					local toggle1 = Instance.new("ImageButton")
 					toggle1.Name = "Toggle"
-					toggle1.Image = assets.toggleBackground
-					toggle1.ImageColor3 = Color3.fromRGB(61, 61, 61)
+					toggle1.Image = ""
+					toggle1.ImageColor3 = Color3.fromRGB(255, 255, 255)
 					toggle1.AutoButtonColor = false
 					toggle1.AnchorPoint = Vector2.new(1, 0.5)
-					toggle1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					toggle1.BackgroundTransparency = 1
+					toggle1.BackgroundColor3 = Color3.fromRGB(61, 61, 61)
+					toggle1.BackgroundTransparency = 0
 					toggle1.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					toggle1.BorderSizePixel = 0
 					toggle1.Position = UDim2.fromScale(1, 0.5)
-					toggle1.Size = UDim2.fromOffset(41, 21)
+					toggle1.Size = UDim2.fromOffset(46, 24)
+					local toggleCorner = Instance.new("UICorner")
+					toggleCorner.CornerRadius = UDim.new(1, 0)
+					toggleCorner.Parent = toggle1
 
 					local toggleUIPadding = Instance.new("UIPadding")
 					toggleUIPadding.Name = "ToggleUIPadding"
-					toggleUIPadding.PaddingBottom = UDim.new(0, 1)
-					toggleUIPadding.PaddingLeft = UDim.new(0, -2)
-					toggleUIPadding.PaddingRight = UDim.new(0, 3)
-					toggleUIPadding.PaddingTop = UDim.new(0, 1)
+					toggleUIPadding.PaddingBottom = UDim.new(0, 2)
+					toggleUIPadding.PaddingLeft = UDim.new(0, 1)
+					toggleUIPadding.PaddingRight = UDim.new(0, 2)
+					toggleUIPadding.PaddingTop = UDim.new(0, 2)
 					toggleUIPadding.Parent = toggle1
 
 					local togglerHead = Instance.new("ImageLabel")
@@ -2393,11 +2603,21 @@ function MacLib:Window(Settings)
 					togglerHead.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					togglerHead.BorderSizePixel = 0
 					togglerHead.Position = UDim2.fromScale(0.5, 0.5)
-					togglerHead.Size = UDim2.fromOffset(15, 15)
+					togglerHead.Size = UDim2.fromOffset(17, 17)
 					togglerHead.ZIndex = 2
 					togglerHead.Parent = toggle1
 
 					toggle1.Parent = toggle
+
+					local toggleRowInteract = Instance.new("TextButton")
+					toggleRowInteract.Name = "RowInteract"
+					toggleRowInteract.Text = ""
+					toggleRowInteract.AutoButtonColor = false
+					toggleRowInteract.BackgroundTransparency = 1
+					toggleRowInteract.BorderSizePixel = 0
+					toggleRowInteract.Size = UDim2.fromScale(1, 1)
+					toggleRowInteract.ZIndex = 0
+					toggleRowInteract.Parent = toggle
 
 					-- Row hover feedback (toggles had none): a soft rounded fill plus the
 					-- label brightening, mirroring the Button row so hovers feel consistent.
@@ -2851,7 +3071,7 @@ function MacLib:Window(Settings)
 					local function ToggleState(State)
 						if State then
 							Tween(toggle1, TweenSettings.Info, {
-								ImageColor3 = TweenSettings.EnabledColors.Toggle
+								BackgroundColor3 = TweenSettings.EnabledColors.Toggle
 							}):Play()
 
 							Tween(togglerHead, TweenSettings.Info, {
@@ -2863,7 +3083,7 @@ function MacLib:Window(Settings)
 							}):Play()
 						else
 							Tween(toggle1, TweenSettings.Info, {
-								ImageColor3 = TweenSettings.DisabledColors.Toggle
+								BackgroundColor3 = TweenSettings.DisabledColors.Toggle
 							}):Play()
 
 							Tween(togglerHead, TweenSettings.Info, {
@@ -2890,6 +3110,7 @@ function MacLib:Window(Settings)
 					end
 
 					toggle1.MouseButton1Click:Connect(Toggle)
+					toggleRowInteract.MouseButton1Click:Connect(Toggle)
 
 					function ToggleFunctions:Toggle()
 						Toggle()
@@ -5730,7 +5951,7 @@ function MacLib:Window(Settings)
 					icon.Position = UDim2.fromScale(0.5, 0.5)
 					icon.Size = UDim2.fromOffset(19, 19)
 					icon.Parent = iconBack
-					MacLib:ApplyIcon(icon, Settings.Icon or "messages-square", Settings.IconColor or accent)
+					MacLib:ApplyIcon(icon, Settings.Icon or "messages-square", Settings.IconColor or Color3.fromRGB(225, 227, 232))
 
 					local title = Instance.new("TextLabel")
 					title.BackgroundTransparency = 1
@@ -6030,7 +6251,7 @@ function MacLib:Window(Settings)
 						headerIcon.BackgroundTransparency = 1
 						headerIcon.ImageTransparency = 0.25
 						headerIcon.Parent = header
-						MacLib:ApplyIcon(headerIcon, Settings.Icon, Settings.IconColor or accentColor)
+						MacLib:ApplyIcon(headerIcon, Settings.Icon, Settings.IconColor or Color3.fromRGB(225, 227, 232))
 						headerText.Position = UDim2.fromOffset(23, 0)
 						headerText.Size = UDim2.new(1, -23, 0, 0)
 					end
@@ -6043,7 +6264,7 @@ function MacLib:Window(Settings)
 					end
 					function HeaderFunctions:SetIcon(Icon, Color)
 						if not headerIcon then return false end
-						return MacLib:ApplyIcon(headerIcon, Icon, Color or accentColor)
+						return MacLib:ApplyIcon(headerIcon, Icon, Color or Color3.fromRGB(225, 227, 232))
 					end
 					
 					return HeaderFunctions
@@ -6374,6 +6595,8 @@ function MacLib:Window(Settings)
 	WindowFunctions.SelectTab = WindowFunctions.Select
 
 	function WindowFunctions:Notify(Settings)
+		Settings = Settings or {}
+		recordNotification(Settings)
 		local NotificationFunctions = {}
 		
 		local notification = Instance.new("Frame")
@@ -6870,6 +7093,44 @@ function MacLib:Window(Settings)
 		return notifications.Visible
 	end
 
+	function WindowFunctions:SetNotificationHistoryEnabled(State)
+		notificationHistoryEnabled = State == true
+		notificationHistoryButton.Visible = notificationHistoryEnabled
+		if not notificationHistoryEnabled then notificationHistoryPanel.Visible = false end
+	end
+
+	function WindowFunctions:GetNotificationHistoryEnabled()
+		return notificationHistoryEnabled
+	end
+
+	function WindowFunctions:GetNotificationHistory()
+		local copy = {}
+		for index, entry in ipairs(notificationHistory) do
+			copy[index] = { Title = entry.Title, Description = entry.Description, Time = entry.Time }
+		end
+		return copy
+	end
+
+	function WindowFunctions:ClearNotificationHistory()
+		table.clear(notificationHistory)
+		rebuildNotificationHistory()
+	end
+
+	function WindowFunctions:ShowNotificationHistory(State)
+		if not notificationHistoryEnabled then return false end
+		notificationHistoryPanel.Visible = State == nil and not notificationHistoryPanel.Visible or State == true
+		if notificationHistoryPanel.Visible then rebuildNotificationHistory() end
+		return notificationHistoryPanel.Visible
+	end
+
+	WindowFunctions:GlobalSetting({
+		Name = "Notification History",
+		Default = notificationHistoryEnabled,
+		Callback = function(state)
+			WindowFunctions:SetNotificationHistoryEnabled(state)
+		end,
+	})
+
 	local openButtonContainer
 	local openButtonEnabled = true
 
@@ -6929,7 +7190,7 @@ function MacLib:Window(Settings)
 			if type(openSettings) ~= "table" then openSettings = {} end
 			openButtonEnabled = openSettings.Enabled ~= false
 			local openColor = openSettings.Color or Color3.fromRGB(225, 227, 232)
-			local openButtonSize = openSettings.Size or UDim2.fromOffset(118, 34)
+			local openButtonSize = openSettings.Size or UDim2.fromOffset(96, 30)
 			local bounceHeight = tonumber(openSettings.BounceHeight) or 3
 			local bounceSpeed = math.max(tonumber(openSettings.BounceSpeed) or 1.05, 0.25)
 			local pulseSpeed = math.max(tonumber(openSettings.PulseSpeed) or 1.45, 0.4)
@@ -7242,8 +7503,31 @@ function MacLib:Window(Settings)
 	end)
 
 	minimize.MouseButton1Click:Connect(ToggleMenu)
+	local closeConfirmationOpen = false
 	exit.MouseButton1Click:Connect(function()
-		WindowFunctions:Unload()
+		if Settings.ConfirmClose == false then
+			WindowFunctions:Unload()
+			return
+		end
+		if closeConfirmationOpen then return end
+		closeConfirmationOpen = true
+		WindowFunctions:Dialog({
+			Title = "Close Menu?",
+			Description = "Are you sure you want to unload this interface?",
+			Buttons = {
+				{
+					Name = "Close",
+					Callback = function()
+						closeConfirmationOpen = false
+						WindowFunctions:Unload()
+					end,
+				},
+				{
+					Name = "Cancel",
+					Callback = function() closeConfirmationOpen = false end,
+				},
+			},
+		})
 	end)
 
 	function WindowFunctions:SetKeybind(Keycode)
@@ -8403,6 +8687,9 @@ do
 			Resizable = settings.Resizable,
 			MinSize = settings.MinSize,
 			MaxSize = settings.MaxSize,
+			ConfirmClose = settings.ConfirmClose,
+			NotificationHistoryEnabled = settings.NotificationHistoryEnabled,
+			NotificationHistoryLimit = settings.NotificationHistoryLimit,
 			DisabledWindowControls = settings.DisabledWindowControls,
 			WindowControls = settings.WindowControls,
 			Keybind = first(settings.Keybind, settings.ToggleKey, Enum.KeyCode.RightControl),
