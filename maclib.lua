@@ -5936,9 +5936,13 @@ function MacLib:Window(Settings)
 					top.Parent = card
 
 					local iconBack = Instance.new("Frame")
+					local rawDiscordIcon = Settings.Icon or "messages-square"
+					local isAssetDiscordIcon = type(rawDiscordIcon) == "number"
+						or (type(rawDiscordIcon) == "string" and (rawDiscordIcon:match("^rbxassetid://") or rawDiscordIcon:match("^%d+$")))
 					iconBack.BackgroundColor3 = accent
-					iconBack.BackgroundTransparency = 0.86
+					iconBack.BackgroundTransparency = isAssetDiscordIcon and 1 or 0.86
 					iconBack.BorderSizePixel = 0
+					iconBack.ClipsDescendants = true
 					iconBack.Size = UDim2.fromOffset(38, 38)
 					iconBack.Parent = top
 					local iconBackCorner = Instance.new("UICorner")
@@ -5949,9 +5953,10 @@ function MacLib:Window(Settings)
 					icon.AnchorPoint = Vector2.new(0.5, 0.5)
 					icon.BackgroundTransparency = 1
 					icon.Position = UDim2.fromScale(0.5, 0.5)
-					icon.Size = UDim2.fromOffset(19, 19)
+					icon.Size = isAssetDiscordIcon and UDim2.fromScale(1, 1) or UDim2.fromOffset(19, 19)
+					icon.ScaleType = isAssetDiscordIcon and Enum.ScaleType.Crop or Enum.ScaleType.Fit
 					icon.Parent = iconBack
-					MacLib:ApplyIcon(icon, Settings.Icon or "messages-square", Settings.IconColor or Color3.fromRGB(225, 227, 232))
+					MacLib:ApplyIcon(icon, rawDiscordIcon, Settings.IconColor or (isAssetDiscordIcon and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(225, 227, 232)))
 
 					local title = Instance.new("TextLabel")
 					title.BackgroundTransparency = 1
@@ -6035,8 +6040,8 @@ function MacLib:Window(Settings)
 						dot.AnchorPoint = Vector2.new(0, 0.5)
 						dot.BackgroundColor3 = dotColor
 						dot.BorderSizePixel = 0
-						dot.Position = UDim2.new(0, 9, 0.5, 0)
-						dot.Size = UDim2.fromOffset(6, 6)
+						dot.Position = UDim2.new(0, 7, 0.5, 0)
+						dot.Size = UDim2.fromOffset(5, 5)
 						dot.Parent = stat
 						local dotCorner = Instance.new("UICorner")
 						dotCorner.CornerRadius = UDim.new(1, 0)
@@ -6045,11 +6050,12 @@ function MacLib:Window(Settings)
 						local label = Instance.new("TextLabel")
 						label.BackgroundTransparency = 1
 						label.FontFace = Font.new(assets.interFont)
-						label.Position = UDim2.fromOffset(21, 0)
-						label.Size = UDim2.new(0.62, -21, 1, 0)
+						label.Position = UDim2.fromOffset(17, 0)
+						label.Size = UDim2.new(1, -54, 1, 0)
 						label.Text = labelText
 						label.TextColor3 = Color3.fromRGB(255, 255, 255)
-						label.TextSize = 10
+						label.TextSize = 9
+						label.TextTruncate = Enum.TextTruncate.AtEnd
 						label.TextTransparency = 0.54
 						label.TextXAlignment = Enum.TextXAlignment.Left
 						label.Parent = stat
@@ -6058,11 +6064,11 @@ function MacLib:Window(Settings)
 						value.AnchorPoint = Vector2.new(1, 0)
 						value.BackgroundTransparency = 1
 						value.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
-						value.Position = UDim2.new(1, -9, 0, 0)
-						value.Size = UDim2.new(0.38, 0, 1, 0)
+						value.Position = UDim2.new(1, -6, 0, 0)
+						value.Size = UDim2.fromOffset(30, 31)
 						value.Text = "--"
 						value.TextColor3 = Color3.fromRGB(238, 238, 240)
-						value.TextSize = 11
+						value.TextSize = 10
 						value.TextXAlignment = Enum.TextXAlignment.Right
 						value.Parent = stat
 						return value, dot
@@ -6993,7 +6999,7 @@ function MacLib:Window(Settings)
 			dialogCanvas:Destroy()
 		end
 		
-		for _, v in pairs(Settings.Buttons) do
+		for _, v in pairs(Settings.Buttons or {}) do
 			local button = Instance.new("TextButton")
 			button.Name = "Button"
 			button.FontFace = Font.new(
@@ -7001,7 +7007,7 @@ function MacLib:Window(Settings)
 				Enum.FontWeight.SemiBold,
 				Enum.FontStyle.Normal
 			)
-			button.Text = v.Name
+			button.Text = tostring(v.Name or v.Title or v.Text or "OK")
 			button.TextColor3 = Color3.fromRGB(255, 255, 255)
 			button.TextSize = 15
 			button.TextTransparency = 0.5
@@ -8599,12 +8605,13 @@ do
 				local buttons = {}
 				for _, button in ipairs(opts.Buttons or {}) do
 					table.insert(buttons, {
+						Name = tostring(first(button.Name, button.Title, button.Text, "OK")),
 						Title = tostring(first(button.Title, button.Text, button.Name, "OK")),
 						Callback = toCallback(button),
 					})
 				end
 				if #buttons == 0 then
-					buttons = {{ Title = "OK" }}
+					buttons = {{ Name = "OK", Title = "OK" }}
 				end
 				return nativeDialog(self, {
 					Title = tostring(first(opts.Title, opts.Name, "Dialog")),
