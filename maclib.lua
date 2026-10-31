@@ -6864,9 +6864,9 @@ function MacLib:Window(Settings)
 
 			openButtonContainer = Instance.new("Frame")
 			openButtonContainer.Name = "OpenButtonContainer"
-			openButtonContainer.AnchorPoint = Vector2.new(0.5, 1)
+			openButtonContainer.AnchorPoint = Vector2.new(0.5, 0)
 			openButtonContainer.BackgroundTransparency = 1
-			openButtonContainer.Position = openSettings.Position or UDim2.new(0.5, 0, 1, -26)
+			openButtonContainer.Position = openSettings.Position or UDim2.new(0.5, 0, 0, 18)
 			openButtonContainer.Size = openButtonSize
 			openButtonContainer.Visible = false
 			openButtonContainer.ZIndex = 250
