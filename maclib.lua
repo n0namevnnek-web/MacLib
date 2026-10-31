@@ -7134,7 +7134,11 @@ function MacLib:Window(Settings)
 			function WindowFunctions:EditOpenButton(config)
 				config = config or {}
 				if config.Color ~= nil then
-					openColor = config.Color
+					local requestedColor = config.Color
+					if typeof(requestedColor) == "ColorSequence" then
+						requestedColor = requestedColor.Keypoints[1] and requestedColor.Keypoints[1].Value or openColor
+					end
+					if typeof(requestedColor) == "Color3" then openColor = requestedColor end
 					glow.BackgroundColor3 = openColor
 					pulseRing.BackgroundColor3 = openColor
 					launcherStroke.Color = openColor
@@ -7142,6 +7146,8 @@ function MacLib:Window(Settings)
 					renderPingChart(colorForPing(pingSamples[#pingSamples] or 0))
 				end
 				if config.DynamicColor ~= nil then dynamicPingColor = config.DynamicColor == true end
+				if config.CornerRadius ~= nil and typeof(config.CornerRadius) == "UDim" then launcherCorner.CornerRadius = config.CornerRadius end
+				if config.StrokeThickness ~= nil then launcherStroke.Thickness = math.max(tonumber(config.StrokeThickness) or 1, 0) end
 				if config.Size ~= nil and typeof(config.Size) == "UDim2" then openButtonContainer.Size = config.Size end
 				if config.BounceHeight ~= nil then bounceHeight = math.max(tonumber(config.BounceHeight) or bounceHeight, 0) end
 				if config.BounceSpeed ~= nil then bounceSpeed = math.max(tonumber(config.BounceSpeed) or bounceSpeed, 0.25) end
@@ -7242,6 +7248,178 @@ function MacLib:Window(Settings)
 	function WindowFunctions:GetScale()
 		return baseUIScale.Scale
 	end
+
+	function WindowFunctions:SetDPIScale(Percent)
+		local scale = math.clamp((tonumber(Percent) or 100) / 100, 0.5, 2)
+		baseUIScale.Scale = scale
+		return scale
+	end
+
+	local backgroundImage
+	local backgroundTransparency = tonumber(Settings.BackgroundImageTransparency) or 0.72
+	local function ensureBackgroundImage()
+		if backgroundImage then return backgroundImage end
+		backgroundImage = Instance.new("ImageLabel")
+		backgroundImage.Name = "WindowBackgroundImage"
+		backgroundImage.BackgroundTransparency = 1
+		backgroundImage.BorderSizePixel = 0
+		backgroundImage.ImageTransparency = backgroundTransparency
+		backgroundImage.ScaleType = Settings.BackgroundImageScaleType or Enum.ScaleType.Crop
+		backgroundImage.Size = UDim2.fromScale(1, 1)
+		backgroundImage.ZIndex = 0
+		backgroundImage.Parent = base
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 4)
+		corner.Parent = backgroundImage
+		return backgroundImage
+	end
+
+	function WindowFunctions:SetBackgroundImage(Value)
+		local image = ensureBackgroundImage()
+		if type(Value) == "number" then Value = "rbxassetid://" .. tostring(Value) end
+		image.Image = tostring(Value or "")
+		image.Visible = image.Image ~= ""
+		return image
+	end
+	WindowFunctions.SetBackground = WindowFunctions.SetBackgroundImage
+
+	function WindowFunctions:SetBackgroundImageTransparency(Value)
+		backgroundTransparency = math.clamp(tonumber(Value) or backgroundTransparency, 0, 1)
+		ensureBackgroundImage().ImageTransparency = backgroundTransparency
+		return backgroundTransparency
+	end
+
+	local footerFrame
+	local footerText
+	local footerCopyValue
+	local function flattenSegments(Value)
+		if type(Value) ~= "table" then return tostring(Value or ""), nil end
+		local parts = {}
+		local copyValue
+		for _, segment in ipairs(Value) do
+			if type(segment) == "table" then
+				table.insert(parts, tostring(segment.Text or segment.Title or segment.Value or ""))
+				if not copyValue and segment.Copyable then copyValue = tostring(segment.CopyText or segment.Text or "") end
+			else
+				table.insert(parts, tostring(segment))
+			end
+		end
+		return table.concat(parts, " "), copyValue
+	end
+
+	local function ensureFooter()
+		if footerFrame then return footerFrame end
+		footerFrame = Instance.new("TextButton")
+		footerFrame.Name = "Footer"
+		footerFrame.AnchorPoint = Vector2.new(0.5, 1)
+		footerFrame.AutoButtonColor = false
+		footerFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+		footerFrame.BackgroundTransparency = 0.18
+		footerFrame.BorderSizePixel = 0
+		footerFrame.Position = UDim2.fromScale(0.5, 1)
+		footerFrame.Size = UDim2.new(1, 0, 0, 23)
+		footerFrame.Text = ""
+		footerFrame.ZIndex = 90
+		footerFrame.Parent = base
+		local footerCorner = Instance.new("UICorner")
+		footerCorner.CornerRadius = UDim.new(0, 4)
+		footerCorner.Parent = footerFrame
+		local footerStroke = Instance.new("UIStroke")
+		footerStroke.Color = Color3.fromRGB(255, 255, 255)
+		footerStroke.Transparency = 0.92
+		footerStroke.Parent = footerFrame
+		footerText = Instance.new("TextLabel")
+		footerText.BackgroundTransparency = 1
+		footerText.FontFace = Font.new(assets.interFont)
+		footerText.Position = UDim2.fromOffset(10, 0)
+		footerText.Size = UDim2.new(1, -20, 1, 0)
+		footerText.TextColor3 = Color3.fromRGB(220, 222, 228)
+		footerText.TextSize = 10
+		footerText.TextTransparency = 0.35
+		footerText.TextTruncate = Enum.TextTruncate.AtEnd
+		footerText.TextXAlignment = Enum.TextXAlignment.Center
+		footerText.ZIndex = 91
+		footerText.Parent = footerFrame
+		footerFrame.MouseButton1Click:Connect(function()
+			local clipboard = setclipboard or toclipboard
+			if clipboard and footerCopyValue then pcall(clipboard, footerCopyValue) end
+		end)
+		return footerFrame
+	end
+
+	function WindowFunctions:SetFooter(Value)
+		local text, copyValue = flattenSegments(Value)
+		ensureFooter()
+		footerText.Text = text
+		footerCopyValue = copyValue
+		footerFrame.Visible = text ~= ""
+		return footerFrame
+	end
+
+	function WindowFunctions:AddWatermark(Segments)
+		local WatermarkFunctions = {}
+		local watermark = Instance.new("TextButton")
+		watermark.Name = "Watermark"
+		watermark.AutoButtonColor = false
+		watermark.AutomaticSize = Enum.AutomaticSize.X
+		watermark.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
+		watermark.BackgroundTransparency = 0.16
+		watermark.BorderSizePixel = 0
+		watermark.Position = UDim2.fromOffset(12, 10)
+		watermark.Size = UDim2.fromOffset(0, 25)
+		watermark.Text = ""
+		watermark.ZIndex = 300
+		watermark.Parent = macLib
+		local watermarkCorner = Instance.new("UICorner")
+		watermarkCorner.CornerRadius = UDim.new(0, 7)
+		watermarkCorner.Parent = watermark
+		local watermarkStroke = Instance.new("UIStroke")
+		watermarkStroke.Color = Color3.fromRGB(255, 255, 255)
+		watermarkStroke.Transparency = 0.88
+		watermarkStroke.Parent = watermark
+		local watermarkPadding = Instance.new("UIPadding")
+		watermarkPadding.PaddingLeft = UDim.new(0, 9)
+		watermarkPadding.PaddingRight = UDim.new(0, 9)
+		watermarkPadding.Parent = watermark
+		local label = Instance.new("TextLabel")
+		label.AutomaticSize = Enum.AutomaticSize.X
+		label.BackgroundTransparency = 1
+		label.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+		label.Size = UDim2.fromOffset(0, 25)
+		label.TextColor3 = Color3.fromRGB(235, 236, 240)
+		label.TextSize = 10
+		label.TextTransparency = 0.22
+		label.ZIndex = 301
+		label.Parent = watermark
+		local copyValue
+		local function update(Value)
+			local text, copy = flattenSegments(Value)
+			label.Text = text
+			copyValue = copy
+		end
+		watermark.MouseButton1Click:Connect(function()
+			local clipboard = setclipboard or toclipboard
+			if clipboard and copyValue then pcall(clipboard, copyValue) end
+		end)
+		function WatermarkFunctions:SetVisible(State) watermark.Visible = State == true end
+		function WatermarkFunctions:SetText(Value) update(Value) end
+		function WatermarkFunctions:SetSegments(Value) update(Value) end
+		function WatermarkFunctions:Destroy() watermark:Destroy() end
+		WatermarkFunctions.Instance = watermark
+		update(Segments)
+		return WatermarkFunctions
+	end
+
+	function WindowFunctions:SetCompact(State)
+		WindowFunctions.Compact = State == true
+		return WindowFunctions.Compact
+	end
+
+	if Settings.BackgroundImage and Settings.BackgroundImage ~= "" then
+		WindowFunctions:SetBackgroundImage(Settings.BackgroundImage)
+	end
+	if Settings.Footer then WindowFunctions:SetFooter(Settings.Footer) end
+	if MacLib.__DPIScale then WindowFunctions:SetDPIScale(MacLib.__DPIScale) end
 
 	macLib.Enabled = false
 	
@@ -7695,6 +7873,7 @@ do
 			local control = controlRef and controlRef()
 			if type(control) == "table" then
 				control.Value = value
+				if control.Disabled or control.Locked or control.StateEnabled == false then return end
 			end
 			if userCallback then
 				userCallback(value)
@@ -7742,6 +7921,21 @@ do
 			if self.Id and MacLib.Options then
 				MacLib.Options[self.Id] = nil
 			end
+		end
+		control.SetDisabled = control.SetDisabled or function(self, state)
+			self.Disabled = state == true
+			return self
+		end
+		control.SetLocked = control.SetLocked or function(self, state)
+			self.Locked = state == true
+			return self
+		end
+		control.SetStateEnabled = control.SetStateEnabled or function(self, state)
+			self.StateEnabled = state ~= false
+			return self
+		end
+		control.IsDisabled = control.IsDisabled or function(self)
+			return self.Disabled == true or self.Locked == true or self.StateEnabled == false
 		end
 
 		if control.UpdateName then
@@ -7799,6 +7993,20 @@ do
 		return control
 	end
 
+	local function finalizeControl(id, control, opts)
+		control = registerOption(id, control)
+		if type(control) ~= "table" then return control end
+		opts = opts or {}
+		control.Disabled = opts.Disabled == true
+		control.Locked = opts.Locked == true
+		control.StateEnabled = opts.Enabled ~= false
+		if opts.Visible == false then
+			if control.SetVisible then control:SetVisible(false)
+			elseif control.SetVisibility then control:SetVisibility(false) end
+		end
+		return control
+	end
+
 	local function patchSection(section)
 		if type(section) ~= "table" or section.__MacCompatSection then
 			return section
@@ -7810,16 +8018,21 @@ do
 			opts = opts or {}
 			local id = first(opts.Id, opts.Flag)
 			local control
+			local userCallback = toCallback(opts)
 			control = patchControl(nativeButton(self, {
 				Name = toName(opts, "Button"),
 				Icon = opts.Icon,
 				IconColor = opts.IconColor,
 				Tooltip = opts.Tooltip,
-				Callback = toCallback(opts),
+				Callback = function(...)
+					if control and control:IsDisabled() then return end
+					if userCallback then return userCallback(...) end
+				end,
 			}), "Button")
-			return registerOption(id, control)
+			return finalizeControl(id, control, opts)
 		end
 		section.AddButton = section.AddButton or function(self, title, opts)
+			if type(title) == "table" and type(opts) == "function" and toCallback(title) == nil then title.Callback = opts end
 			local _, merged = mergeIdOptions(title, opts)
 			opts = merged
 			return self:Button(opts)
@@ -7840,7 +8053,7 @@ do
 				Callback = callbackProxy(userCallback, function() return control end),
 			}), "Toggle")
 			control.Value = control.GetState and control:GetState() or first(opts.Default, opts.Value, false)
-			return registerOption(id, control)
+			return finalizeControl(id, control, opts)
 		end
 		section.AddToggle = section.AddToggle or function(self, title, opts)
 			local _, merged = mergeIdOptions(title, opts)
@@ -7867,7 +8080,7 @@ do
 				Callback = callbackProxy(userCallback, function() return control end),
 			}), "Slider")
 			control.Value = control.GetValue and control:GetValue() or tonumber(default) or tonumber(min) or 0
-			return registerOption(id, control)
+			return finalizeControl(id, control, opts)
 		end
 		section.AddSlider = section.AddSlider or function(self, title, opts)
 			local _, merged = mergeIdOptions(title, opts)
@@ -7890,7 +8103,7 @@ do
 				onChanged = callbackProxy(callback, function() return control end),
 			}), "Input")
 			control.Value = control.GetInput and control:GetInput() or tostring(first(opts.Default, opts.Value, opts.Text, ""))
-			return registerOption(id, control)
+			return finalizeControl(id, control, opts)
 		end
 		section.AddInput = section.AddInput or function(self, title, opts)
 			local _, merged = mergeIdOptions(title, opts)
@@ -7910,7 +8123,7 @@ do
 				Name = toName(opts, "Dropdown"),
 				Options = options,
 				Multi = multi,
-				Search = opts.Search == true,
+				Search = opts.Search == true or opts.Searchable == true,
 				Required = opts.Required ~= false,
 				Default = normalizeDefault(first(opts.Default, opts.Value, opts.CurrentOption), options, multi),
 				Callback = callbackProxy(userCallback, function() return control end),
@@ -7940,7 +8153,7 @@ do
 				if self.InsertOptions then self:InsertOptions(normalized) end
 				return self
 			end
-			return registerOption(id, control)
+			return finalizeControl(id, control, opts)
 		end
 		section.AddDropdown = section.AddDropdown or function(self, title, opts)
 			local _, merged = mergeIdOptions(title, opts)
@@ -7952,10 +8165,10 @@ do
 		function section:Paragraph(opts)
 			opts = opts or {}
 			local id = first(opts.Id, opts.Flag)
-			return registerOption(id, patchControl(nativeParagraph(self, {
+			return finalizeControl(id, patchControl(nativeParagraph(self, {
 				Header = toName(opts, "Paragraph"),
 				Body = toDescription(opts),
-			}), "Paragraph"))
+			}), "Paragraph"), opts)
 		end
 		section.AddParagraph = section.AddParagraph or function(self, title, opts)
 			local _, merged = mergeIdOptions(title, opts)
@@ -8004,7 +8217,13 @@ do
 			}))
 			local title = first(opts.Title, opts.Name, opts.Text)
 			if title and section.Header then
-				pcall(function() section:Header({ Text = tostring(title) }) end)
+				pcall(function()
+					section:Header({
+						Text = tostring(title),
+						Icon = opts.Icon,
+						IconColor = opts.IconColor,
+					})
+				end)
 			end
 			local desc = first(opts.Desc, opts.Description, opts.Body)
 			if desc and section.SubLabel then
@@ -8138,7 +8357,7 @@ do
 		settings = settings or {}
 		local window = nativeWindow(self, {
 			Title = tostring(first(settings.Title, settings.Name, "MacLib")),
-			Subtitle = tostring(first(settings.Subtitle, settings.SubTitle, settings.Description, "")),
+			Subtitle = tostring(first(settings.Subtitle, settings.SubTitle, settings.Author, settings.Description, "")),
 			Size = settings.Size,
 			Accent = settings.Accent,
 			DragStyle = settings.DragStyle,
@@ -8147,18 +8366,25 @@ do
 			AnonymousName = settings.AnonymousName,
 			User = settings.User,
 			AutoSelect = settings.AutoSelect,
-			AcrylicBlur = settings.AcrylicBlur,
+			AcrylicBlur = first(settings.AcrylicBlur, settings.Acrylic, true),
 			DisabledWindowControls = settings.DisabledWindowControls,
 			WindowControls = settings.WindowControls,
-			Keybind = settings.Keybind,
+			Keybind = first(settings.Keybind, settings.ToggleKey, Enum.KeyCode.RightControl),
 			Tags = settings.Tags,
 			OpenButton = settings.OpenButton,
+			BackgroundImage = settings.BackgroundImage,
+			BackgroundImageTransparency = settings.BackgroundImageTransparency,
+			BackgroundImageScaleType = settings.BackgroundImageScaleType,
+			Footer = settings.Footer,
 		})
 		self.__LastWindow = patchWindow(window)
 		self.Window = self.__LastWindow
 		self.UseAcrylic = settings.Acrylic or false
 		self.Acrylic = settings.Acrylic or false
 		self.Transparent = settings.Transparent or false
+		if settings.Footer then self.__LastWindow:SetFooter(settings.Footer) end
+		if settings.BackgroundImage and settings.BackgroundImage ~= "" then self.__LastWindow:SetBackgroundImage(settings.BackgroundImage) end
+		if settings.BackgroundImageTransparency ~= nil then self.__LastWindow:SetBackgroundImageTransparency(settings.BackgroundImageTransparency) end
 		return self.__LastWindow
 	end
 
@@ -8171,6 +8397,42 @@ do
 	end
 	MacLib.MakeWindow = MacLib.MakeWindow or MacLib.CreateWindow
 	MacLib.NewWindow = MacLib.NewWindow or MacLib.CreateWindow
+
+	MacLib.Scheme = MacLib.Scheme or {
+		BackgroundColor = Color3.fromRGB(15, 15, 17),
+		MainColor = Color3.fromRGB(22, 23, 27),
+		AccentColor = Color3.fromRGB(120, 150, 255),
+		OutlineColor = Color3.fromRGB(52, 54, 61),
+		FontColor = Color3.fromRGB(245, 245, 247),
+		DarkColor = Color3.fromRGB(9, 9, 11),
+		WhiteColor = Color3.fromRGB(255, 255, 255),
+		BackgroundImage = "",
+	}
+
+	function MacLib:SetIconModule(Module)
+		return self:SetIconProvider(Module)
+	end
+
+	function MacLib:SetDPIScale(Percent)
+		self.__DPIScale = math.clamp(tonumber(Percent) or 100, 50, 200)
+		if self.__LastWindow and self.__LastWindow.SetDPIScale then
+			self.__LastWindow:SetDPIScale(self.__DPIScale)
+		end
+		return self.__DPIScale
+	end
+
+	function MacLib:UpdateColors()
+		if self.__LastWindow and self.__LastWindow.SetAccent and self.Scheme.AccentColor then
+			self.__LastWindow:SetAccent(self.Scheme.AccentColor)
+		end
+		return self.Scheme
+	end
+
+	function MacLib:AddWatermark(Segments)
+		if self.__LastWindow and self.__LastWindow.AddWatermark then
+			return self.__LastWindow:AddWatermark(Segments)
+		end
+	end
 
 	function MacLib:Notify(opts)
 		if self ~= MacLib then
