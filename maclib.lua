@@ -3012,7 +3012,12 @@ function MacLib:Window(Settings)
 
 					-- DisplayMethod used to be mandatory. Keep old values working while
 					-- defaulting safely for examples and compatibility wrappers.
-					local ValueDisplayMethod = DisplayMethods[Settings.DisplayMethod or "Value"] or DisplayMethods.Value
+					local function FormatSliderValue(value)
+						local formatter = DisplayMethods[tostring(Settings.DisplayMethod or "Value")] or DisplayMethods.Value
+						if type(formatter) ~= "function" then return tostring(value) end
+						local ok, result = pcall(formatter, value)
+						return ok and tostring(result) or tostring(value)
+					end
 					local finalValue
 
 					local function SetValue(val, ignorecallback)
@@ -3035,7 +3040,7 @@ function MacLib:Window(Settings)
 						sliderHead.Position = pos
 
 						finalValue = posXScale * range + minimum
-						sliderValue.Text = ValueDisplayMethod(finalValue)
+						sliderValue.Text = FormatSliderValue(finalValue)
 
 						if not ignorecallback then
 							task.spawn(function()
@@ -3078,7 +3083,7 @@ function MacLib:Window(Settings)
 							local newValue = math.clamp(value, Settings.Minimum, Settings.Maximum)
 							SetValue(newValue)
 						else
-							sliderValue.Text = ValueDisplayMethod(finalValue or Settings.Default or Settings.Minimum or 0)
+							sliderValue.Text = FormatSliderValue(finalValue or Settings.Default or Settings.Minimum or 0)
 						end
 					end)
 
@@ -6822,17 +6827,42 @@ function MacLib:Window(Settings)
 		if openSettings ~= false then
 			if type(openSettings) ~= "table" then openSettings = {} end
 			openButtonEnabled = openSettings.Enabled ~= false
-			local openColor = openSettings.Color or accentColor
+			local openColor = openSettings.Color or Color3.fromRGB(82, 211, 137)
+			local openButtonSize = openSettings.Size or UDim2.fromOffset(158, 50)
+			local bounceHeight = tonumber(openSettings.BounceHeight) or 6
+			local bounceSpeed = math.max(tonumber(openSettings.BounceSpeed) or 1.05, 0.25)
+			local pulseSpeed = math.max(tonumber(openSettings.PulseSpeed) or 1.45, 0.4)
 
 			openButtonContainer = Instance.new("Frame")
 			openButtonContainer.Name = "OpenButtonContainer"
 			openButtonContainer.AnchorPoint = Vector2.new(0.5, 1)
 			openButtonContainer.BackgroundTransparency = 1
 			openButtonContainer.Position = openSettings.Position or UDim2.new(0.5, 0, 1, -26)
-			openButtonContainer.Size = UDim2.fromOffset(142, 42)
+			openButtonContainer.Size = openButtonSize
 			openButtonContainer.Visible = openButtonEnabled and not windowState
 			openButtonContainer.ZIndex = 250
 			openButtonContainer.Parent = macLib
+
+			local motion = Instance.new("Frame")
+			motion.Name = "PingMotion"
+			motion.BackgroundTransparency = 1
+			motion.Size = UDim2.fromScale(1, 1)
+			motion.ZIndex = 250
+			motion.Parent = openButtonContainer
+
+			local pulseRing = Instance.new("Frame")
+			pulseRing.Name = "PulseRing"
+			pulseRing.AnchorPoint = Vector2.new(0.5, 0.5)
+			pulseRing.BackgroundColor3 = openColor
+			pulseRing.BackgroundTransparency = 0.78
+			pulseRing.BorderSizePixel = 0
+			pulseRing.Position = UDim2.fromScale(0.5, 0.5)
+			pulseRing.Size = UDim2.new(1, 6, 1, 6)
+			pulseRing.ZIndex = 249
+			pulseRing.Parent = motion
+			local pulseCorner = Instance.new("UICorner")
+			pulseCorner.CornerRadius = UDim.new(1, 0)
+			pulseCorner.Parent = pulseRing
 
 			local glow = Instance.new("Frame")
 			glow.Name = "Glow"
@@ -6841,9 +6871,9 @@ function MacLib:Window(Settings)
 			glow.BackgroundTransparency = 0.88
 			glow.BorderSizePixel = 0
 			glow.Position = UDim2.fromScale(0.5, 0.5)
-			glow.Size = UDim2.new(1, 8, 1, 8)
+			glow.Size = UDim2.new(1, 10, 1, 10)
 			glow.ZIndex = 250
-			glow.Parent = openButtonContainer
+			glow.Parent = motion
 			local glowCorner = Instance.new("UICorner")
 			glowCorner.CornerRadius = UDim.new(1, 0)
 			glowCorner.Parent = glow
@@ -6861,7 +6891,7 @@ function MacLib:Window(Settings)
 			launcher.TextColor3 = Color3.fromRGB(245, 245, 245)
 			launcher.TextSize = 12
 			launcher.ZIndex = 252
-			launcher.Parent = openButtonContainer
+			launcher.Parent = motion
 			local launcherCorner = Instance.new("UICorner")
 			launcherCorner.CornerRadius = UDim.new(1, 0)
 			launcherCorner.Parent = launcher
@@ -6877,8 +6907,8 @@ function MacLib:Window(Settings)
 			launcherIconBack.BackgroundColor3 = openColor
 			launcherIconBack.BackgroundTransparency = 0.79
 			launcherIconBack.BorderSizePixel = 0
-			launcherIconBack.Position = UDim2.fromOffset(7, 7)
-			launcherIconBack.Size = UDim2.fromOffset(28, 28)
+			launcherIconBack.Position = UDim2.fromOffset(9, 9)
+			launcherIconBack.Size = UDim2.fromOffset(32, 32)
 			launcherIconBack.ZIndex = 253
 			launcherIconBack.Parent = launcher
 			local launcherIconCorner = Instance.new("UICorner")
@@ -6889,11 +6919,11 @@ function MacLib:Window(Settings)
 			launcherTitle.Name = "Title"
 			launcherTitle.BackgroundTransparency = 1
 			launcherTitle.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
-			launcherTitle.Position = UDim2.fromOffset(43, 0)
-			launcherTitle.Size = UDim2.new(1, -53, 1, 0)
+			launcherTitle.Position = UDim2.fromOffset(50, 0)
+			launcherTitle.Size = UDim2.new(1, -62, 1, 0)
 			launcherTitle.Text = tostring(openSettings.Title or "Open Menu")
 			launcherTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
-			launcherTitle.TextSize = 12
+			launcherTitle.TextSize = 13
 			launcherTitle.TextTruncate = Enum.TextTruncate.AtEnd
 			launcherTitle.TextXAlignment = Enum.TextXAlignment.Left
 			launcherTitle.ZIndex = 253
@@ -6904,10 +6934,25 @@ function MacLib:Window(Settings)
 			launcherIcon.AnchorPoint = Vector2.new(0.5, 0.5)
 			launcherIcon.BackgroundTransparency = 1
 			launcherIcon.Position = UDim2.fromScale(0.5, 0.5)
-			launcherIcon.Size = UDim2.fromOffset(15, 15)
+			launcherIcon.Size = UDim2.fromOffset(17, 17)
 			launcherIcon.ZIndex = 254
 			launcherIcon.Parent = launcherIconBack
 			MacLib:ApplyIcon(launcherIcon, openSettings.Icon or "panel-left-open", openSettings.IconColor or openColor)
+
+			local pinTip = Instance.new("Frame")
+			pinTip.Name = "PinTip"
+			pinTip.AnchorPoint = Vector2.new(0.5, 0.5)
+			pinTip.BackgroundColor3 = openColor
+			pinTip.BackgroundTransparency = 0.3
+			pinTip.BorderSizePixel = 0
+			pinTip.Position = UDim2.new(0.5, 0, 1, 1)
+			pinTip.Rotation = 45
+			pinTip.Size = UDim2.fromOffset(11, 11)
+			pinTip.ZIndex = 251
+			pinTip.Parent = motion
+			local pinTipCorner = Instance.new("UICorner")
+			pinTipCorner.CornerRadius = UDim.new(0, 2)
+			pinTipCorner.Parent = pinTip
 
 			launcher.MouseEnter:Connect(function()
 				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0 }):Play()
@@ -6956,12 +7001,27 @@ function MacLib:Window(Settings)
 
 			if openSettings.Bobbing ~= false then
 				task.spawn(function()
-					while launcher.Parent and macLib.Parent do
-						local up = Tween(launcher, TweenInfo.new(1.05, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(0, -3) })
+					while motion.Parent and macLib.Parent do
+						local up = Tween(motion, TweenInfo.new(bounceSpeed, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(0, -bounceHeight) })
 						up:Play(); up.Completed:Wait()
-						if not launcher.Parent then break end
-						local down = Tween(launcher, TweenInfo.new(1.05, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(0, 0) })
+						if not motion.Parent then break end
+						local down = Tween(motion, TweenInfo.new(bounceSpeed, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(0, 0) })
 						down:Play(); down.Completed:Wait()
+					end
+				end)
+			end
+
+			if openSettings.Pulse ~= false then
+				task.spawn(function()
+					while pulseRing.Parent and macLib.Parent do
+						pulseRing.Size = UDim2.new(1, 4, 1, 4)
+						pulseRing.BackgroundTransparency = 0.76
+						local pulse = Tween(pulseRing, TweenInfo.new(pulseSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+							Size = UDim2.new(1, 28, 1, 28),
+							BackgroundTransparency = 1,
+						})
+						pulse:Play(); pulse.Completed:Wait()
+						task.wait(0.15)
 					end
 				end)
 			end
@@ -6973,10 +7033,16 @@ function MacLib:Window(Settings)
 				if config.Color ~= nil then
 					openColor = config.Color
 					glow.BackgroundColor3 = openColor
+					pulseRing.BackgroundColor3 = openColor
 					launcherStroke.Color = openColor
 					launcherIconBack.BackgroundColor3 = openColor
+					pinTip.BackgroundColor3 = openColor
 					launcherIcon.ImageColor3 = config.IconColor or openColor
 				end
+				if config.Size ~= nil and typeof(config.Size) == "UDim2" then openButtonContainer.Size = config.Size end
+				if config.BounceHeight ~= nil then bounceHeight = math.max(tonumber(config.BounceHeight) or bounceHeight, 0) end
+				if config.BounceSpeed ~= nil then bounceSpeed = math.max(tonumber(config.BounceSpeed) or bounceSpeed, 0.25) end
+				if config.PulseSpeed ~= nil then pulseSpeed = math.max(tonumber(config.PulseSpeed) or pulseSpeed, 0.4) end
 				if config.Position ~= nil then openButtonContainer.Position = config.Position end
 				if config.Enabled ~= nil then
 					openButtonEnabled = config.Enabled == true
