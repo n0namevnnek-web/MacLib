@@ -294,7 +294,7 @@ function MacLib:Window(Settings)
 	base.BackgroundColor3 = Settings.BackgroundColor or Color3.fromRGB(15, 15, 15)
 	local configuredBackgroundTransparency = tonumber(Settings.BackgroundTransparency)
 	if configuredBackgroundTransparency == nil then
-		configuredBackgroundTransparency = Settings.Transparent and 0.1 or (Settings.AcrylicBlur and 0.05 or 0)
+		configuredBackgroundTransparency = Settings.Transparent and 0.12 or (Settings.AcrylicBlur and 0.05 or 0)
 	end
 	configuredBackgroundTransparency = math.clamp(configuredBackgroundTransparency, 0, 0.95)
 	base.BackgroundTransparency = configuredBackgroundTransparency
@@ -2358,7 +2358,7 @@ function MacLib:Window(Settings)
 					section.Name = "Section"
 					section.AutomaticSize = Enum.AutomaticSize.Y
 					section.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-					section.BackgroundTransparency = 0.92
+					section.BackgroundTransparency = 0.95
 					section.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					section.BorderSizePixel = 0
 					section.Position = UDim2.fromScale(0, 6.78e-08)
@@ -6603,7 +6603,8 @@ function MacLib:Window(Settings)
 		notification.Name = "Notification"
 		notification.AnchorPoint = Vector2.new(0.5, 0.5)
 		notification.AutomaticSize = Enum.AutomaticSize.Y
-		notification.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+		notification.BackgroundColor3 = Color3.fromRGB(245, 246, 249)
+		notification.BackgroundTransparency = tonumber(Settings.BackgroundTransparency) or 0.72
 		notification.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		notification.BorderSizePixel = 0
 		notification.Position = UDim2.fromScale(0.5, 0.5)
@@ -6615,7 +6616,7 @@ function MacLib:Window(Settings)
 		notificationUIStroke.Name = "NotificationUIStroke"
 		notificationUIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		notificationUIStroke.Color = Color3.fromRGB(255, 255, 255)
-		notificationUIStroke.Transparency = 0.9
+		notificationUIStroke.Transparency = 0.62
 		notificationUIStroke.Parent = notification
 
 		local notificationUICorner = Instance.new("UICorner")
@@ -7504,30 +7505,30 @@ function MacLib:Window(Settings)
 
 	minimize.MouseButton1Click:Connect(ToggleMenu)
 	local closeConfirmationOpen = false
+	local closeConfirmationToken = 0
 	exit.MouseButton1Click:Connect(function()
 		if Settings.ConfirmClose == false then
 			WindowFunctions:Unload()
 			return
 		end
-		if closeConfirmationOpen then return end
+		if closeConfirmationOpen then
+			WindowFunctions:Unload()
+			return
+		end
 		closeConfirmationOpen = true
-		WindowFunctions:Dialog({
+		WindowFunctions:Notify({
 			Title = "Close Menu?",
-			Description = "Are you sure you want to unload this interface?",
-			Buttons = {
-				{
-					Name = "Close",
-					Callback = function()
-						closeConfirmationOpen = false
-						WindowFunctions:Unload()
-					end,
-				},
-				{
-					Name = "Cancel",
-					Callback = function() closeConfirmationOpen = false end,
-				},
-			},
+			Description = "Press the red button again within 4 seconds to unload.",
+			Lifetime = 4,
+			SkipHistory = true,
 		})
+		closeConfirmationToken += 1
+		local confirmationToken = closeConfirmationToken
+		task.delay(4, function()
+			if closeConfirmationToken == confirmationToken then
+				closeConfirmationOpen = false
+			end
+		end)
 	end)
 
 	function WindowFunctions:SetKeybind(Keycode)
@@ -7645,6 +7646,7 @@ function MacLib:Window(Settings)
 	function WindowFunctions:SetBackgroundImage(Value)
 		local image = ensureBackgroundImage()
 		if type(Value) == "number" then Value = "rbxassetid://" .. tostring(Value) end
+		if type(Value) == "string" and Value:match("^%d+$") then Value = "rbxassetid://" .. Value end
 		image.Image = tostring(Value or "")
 		image.Visible = image.Image ~= ""
 		return image
@@ -7655,6 +7657,12 @@ function MacLib:Window(Settings)
 		backgroundTransparency = math.clamp(tonumber(Value) or backgroundTransparency, 0, 1)
 		ensureBackgroundImage().ImageTransparency = backgroundTransparency
 		return backgroundTransparency
+	end
+
+	function WindowFunctions:SetBackgroundImageScaleType(Value)
+		local image = ensureBackgroundImage()
+		if typeof(Value) == "EnumItem" then image.ScaleType = Value end
+		return image.ScaleType
 	end
 
 	local footerFrame
@@ -8695,7 +8703,7 @@ do
 			Keybind = first(settings.Keybind, settings.ToggleKey, Enum.KeyCode.RightControl),
 			Tags = settings.Tags,
 			OpenButton = settings.OpenButton,
-			BackgroundImage = settings.BackgroundImage,
+			BackgroundImage = first(settings.BackgroundImage, settings.Background),
 			BackgroundImageTransparency = settings.BackgroundImageTransparency,
 			BackgroundImageScaleType = settings.BackgroundImageScaleType,
 			Footer = settings.Footer,
@@ -8706,7 +8714,8 @@ do
 		self.Acrylic = settings.Acrylic or false
 		self.Transparent = settings.Transparent or false
 		if settings.Footer then self.__LastWindow:SetFooter(settings.Footer) end
-		if settings.BackgroundImage and settings.BackgroundImage ~= "" then self.__LastWindow:SetBackgroundImage(settings.BackgroundImage) end
+		local requestedBackground = first(settings.BackgroundImage, settings.Background)
+		if requestedBackground and requestedBackground ~= "" then self.__LastWindow:SetBackgroundImage(requestedBackground) end
 		if settings.BackgroundImageTransparency ~= nil then self.__LastWindow:SetBackgroundImageTransparency(settings.BackgroundImageTransparency) end
 		return self.__LastWindow
 	end
