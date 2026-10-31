@@ -6855,12 +6855,12 @@ function MacLib:Window(Settings)
 		if openSettings ~= false then
 			if type(openSettings) ~= "table" then openSettings = {} end
 			openButtonEnabled = openSettings.Enabled ~= false
-			local openColor = openSettings.Color or Color3.fromRGB(82, 211, 137)
-			local openButtonSize = openSettings.Size or UDim2.fromOffset(112, 66)
-			local bounceHeight = tonumber(openSettings.BounceHeight) or 6
+			local openColor = openSettings.Color or Color3.fromRGB(225, 227, 232)
+			local openButtonSize = openSettings.Size or UDim2.fromOffset(118, 34)
+			local bounceHeight = tonumber(openSettings.BounceHeight) or 3
 			local bounceSpeed = math.max(tonumber(openSettings.BounceSpeed) or 1.05, 0.25)
 			local pulseSpeed = math.max(tonumber(openSettings.PulseSpeed) or 1.45, 0.4)
-			local dynamicPingColor = openSettings.DynamicColor ~= false
+			local dynamicPingColor = openSettings.DynamicColor == true
 
 			openButtonContainer = Instance.new("Frame")
 			openButtonContainer.Name = "OpenButtonContainer"
@@ -6883,7 +6883,7 @@ function MacLib:Window(Settings)
 			pulseRing.Name = "PulseRing"
 			pulseRing.AnchorPoint = Vector2.new(0.5, 0.5)
 			pulseRing.BackgroundColor3 = openColor
-			pulseRing.BackgroundTransparency = 0.78
+			pulseRing.BackgroundTransparency = 0.86
 			pulseRing.BorderSizePixel = 0
 			pulseRing.Position = UDim2.fromScale(0.5, 0.5)
 			pulseRing.Size = UDim2.new(1, 6, 1, 6)
@@ -6935,8 +6935,8 @@ function MacLib:Window(Settings)
 			chart.Name = "LivePingChart"
 			chart.BackgroundTransparency = 1
 			chart.ClipsDescendants = true
-			chart.Position = UDim2.fromOffset(11, 10)
-			chart.Size = UDim2.new(1, -22, 1, -20)
+			chart.Position = UDim2.fromOffset(10, 6)
+			chart.Size = UDim2.new(1, -20, 1, -12)
 			chart.ZIndex = 253
 			chart.Parent = launcher
 
@@ -6975,7 +6975,7 @@ function MacLib:Window(Settings)
 				dot.AnchorPoint = Vector2.new(0.5, 0.5)
 				dot.BackgroundColor3 = openColor
 				dot.BorderSizePixel = 0
-				dot.Size = UDim2.fromOffset(index == sampleCount and 5 or 3, index == sampleCount and 5 or 3)
+				dot.Size = UDim2.fromOffset(index == sampleCount and 4 or 2, index == sampleCount and 4 or 2)
 				dot.ZIndex = 255
 				dot.Parent = chart
 				local dotCorner = Instance.new("UICorner")
@@ -7005,8 +7005,8 @@ function MacLib:Window(Settings)
 
 			local function renderPingChart(color)
 				local size = chart.AbsoluteSize
-				local width = math.max(size.X, 90)
-				local height = math.max(size.Y, 42)
+				local width = size.X > 1 and size.X or 98
+				local height = size.Y > 1 and size.Y or 22
 				local maxPing = math.max(tonumber(openSettings.MaxPing) or 300, 1)
 				local points = {}
 				for index, ping in ipairs(pingSamples) do
@@ -7035,8 +7035,9 @@ function MacLib:Window(Settings)
 			pinTip.BorderSizePixel = 0
 			pinTip.Position = UDim2.new(0.5, 0, 1, 1)
 			pinTip.Rotation = 45
-			pinTip.Size = UDim2.fromOffset(11, 11)
+			pinTip.Size = UDim2.fromOffset(7, 7)
 			pinTip.ZIndex = 251
+			pinTip.Visible = openSettings.PinTip == true
 			pinTip.Parent = motion
 			local pinTipCorner = Instance.new("UICorner")
 			pinTipCorner.CornerRadius = UDim.new(0, 2)
@@ -7119,9 +7120,9 @@ function MacLib:Window(Settings)
 				task.spawn(function()
 					while pulseRing.Parent and macLib.Parent do
 						pulseRing.Size = UDim2.new(1, 4, 1, 4)
-						pulseRing.BackgroundTransparency = 0.76
+						pulseRing.BackgroundTransparency = 0.84
 						local pulse = Tween(pulseRing, TweenInfo.new(pulseSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-							Size = UDim2.new(1, 28, 1, 28),
+							Size = UDim2.new(1, 14, 1, 14),
 							BackgroundTransparency = 1,
 						})
 						pulse:Play(); pulse.Completed:Wait()
@@ -7278,13 +7279,13 @@ function MacLib:Demo()
 		},
 		OpenButton = {
 			Enabled = true,
-			Color = Color3.fromRGB(82, 211, 137),
-			Size = UDim2.fromOffset(112, 66),
+			Color = Color3.fromRGB(225, 227, 232),
+			Size = UDim2.fromOffset(118, 34),
 			Draggable = true,
 			Bobbing = true,
-			BounceHeight = 6,
+			BounceHeight = 3,
 			Pulse = true,
-			DynamicColor = true,
+			DynamicColor = false,
 			UpdateRate = 0.8,
 		},
 	})
