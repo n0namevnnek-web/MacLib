@@ -34,6 +34,75 @@ local assets = {
 	searchIcon = "rbxassetid://86737463322606"
 }
 
+--// Modern icon system
+-- Accepts Lucide names ("house" or "lucide:house"), rbxassetid strings,
+-- numeric asset ids and custom icon descriptors. Lucide is loaded lazily so
+-- scripts that only use image assets keep the original startup speed.
+MacLib.Icons = {}
+MacLib.IconProvider = nil
+MacLib.LucideSource = "https://raw.githubusercontent.com/deividcomsono/lucide-roblox-direct/refs/heads/main/source.lua"
+
+function MacLib:SetIconProvider(provider)
+	self.IconProvider = provider
+end
+
+function MacLib:RegisterIcon(name, icon)
+	if type(name) == "string" and name ~= "" then
+		self.Icons[string.lower(name)] = icon
+	end
+	return icon
+end
+
+local function loadLucideProvider()
+	if MacLib.IconProvider then return MacLib.IconProvider end
+	local ok, provider = pcall(function()
+		return loadstring(game:HttpGet(MacLib.LucideSource))()
+	end)
+	if ok and type(provider) == "table" then
+		MacLib.IconProvider = provider
+	end
+	return MacLib.IconProvider
+end
+
+function MacLib:ResolveIcon(icon)
+	if icon == nil or icon == "" then return nil end
+	if type(icon) == "table" then return icon end
+	if type(icon) == "number" then
+		return { Url = "rbxassetid://" .. tostring(icon) }
+	end
+	if type(icon) ~= "string" then return nil end
+
+	local direct = icon:match("^rbxassetid://") or icon:match("^rbxasset://")
+		or icon:match("^https?://") or icon:match("^rbxthumb://")
+	if direct then return { Url = icon } end
+
+	local name = string.lower(icon:gsub("^lucide:", ""))
+	local registered = self.Icons[name]
+	if registered then return self:ResolveIcon(registered) end
+
+	local provider = loadLucideProvider()
+	if provider and type(provider.GetAsset) == "function" then
+		local ok, resolved = pcall(provider.GetAsset, name)
+		if ok and resolved then return resolved end
+	end
+	return nil
+end
+
+function MacLib:ApplyIcon(imageObject, icon, color)
+	if not imageObject then return false end
+	local data = self:ResolveIcon(icon)
+	if not data then
+		imageObject.Visible = false
+		return false
+	end
+	imageObject.Visible = true
+	imageObject.Image = data.Url or data.Image or ""
+	imageObject.ImageRectOffset = data.ImageRectOffset or Vector2.zero
+	imageObject.ImageRectSize = data.ImageRectSize or Vector2.zero
+	if color then imageObject.ImageColor3 = color end
+	return true
+end
+
 --// Functions
 local function Tween(instance, tweeninfo, propertytable)
 	return TweenService:Create(instance, tweeninfo, propertytable)
@@ -498,7 +567,7 @@ function MacLib:Window(Settings)
 	informationGroup.BackgroundTransparency = 1
 	informationGroup.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	informationGroup.BorderSizePixel = 0
-	informationGroup.Size = UDim2.fromScale(1, 1)
+	informationGroup.Size = UDim2.new(1, 0, 1, -34)
 
 	local informationGroupUIPadding = Instance.new("UIPadding")
 	informationGroupUIPadding.Name = "InformationGroupUIPadding"
@@ -610,6 +679,132 @@ function MacLib:Window(Settings)
 	userAndDisplayFrame.Parent = informationGroup
 
 	informationGroup.Parent = userInfo
+
+	-- A compact, horizontally scrollable tag rail beneath the user identity.
+	-- Mouse wheel and touch dragging both work through the native ScrollingFrame.
+	local tagRail = Instance.new("ScrollingFrame")
+	tagRail.Name = "TagRail"
+	tagRail.Active = true
+	tagRail.AutomaticCanvasSize = Enum.AutomaticSize.X
+	tagRail.BackgroundTransparency = 1
+	tagRail.BorderSizePixel = 0
+	tagRail.BottomImage = ""
+	tagRail.TopImage = ""
+	tagRail.ScrollBarThickness = 0
+	tagRail.CanvasSize = UDim2.new()
+	tagRail.Position = UDim2.new(0, 15, 1, -31)
+	tagRail.Size = UDim2.new(1, -30, 0, 26)
+	tagRail.ScrollingDirection = Enum.ScrollingDirection.X
+	tagRail.Parent = userInfo
+
+	local tagRailLayout = Instance.new("UIListLayout")
+	tagRailLayout.FillDirection = Enum.FillDirection.Horizontal
+	tagRailLayout.Padding = UDim.new(0, 6)
+	tagRailLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tagRailLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	tagRailLayout.Parent = tagRail
+
+	tagRail.InputChanged:Connect(function(input)
+		if input.UserInputType ~= Enum.UserInputType.MouseWheel then return end
+		local maxX = math.max(0, tagRail.AbsoluteCanvasSize.X - tagRail.AbsoluteWindowSize.X)
+		tagRail.CanvasPosition = Vector2.new(
+			math.clamp(tagRail.CanvasPosition.X - input.Position.Z * 34, 0, maxX),
+			0
+		)
+	end)
+
+	function WindowFunctions:Tag(TagSettings)
+		TagSettings = TagSettings or {}
+		local TagFunctions = {}
+		local color = TagSettings.Color or accentColor
+
+		local pill = Instance.new("TextButton")
+		pill.Name = "Tag"
+		pill.Text = ""
+		pill.AutoButtonColor = false
+		pill.AutomaticSize = Enum.AutomaticSize.X
+		pill.BackgroundColor3 = color
+		pill.BackgroundTransparency = 0.82
+		pill.BorderSizePixel = 0
+		pill.Size = UDim2.fromOffset(0, 23)
+		pill.Parent = tagRail
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(1, 0)
+		corner.Parent = pill
+
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Color = color
+		stroke.Transparency = 0.45
+		stroke.Thickness = 1
+		stroke.Parent = pill
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 8)
+		padding.PaddingRight = UDim.new(0, 8)
+		padding.Parent = pill
+
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.Padding = UDim.new(0, 5)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.VerticalAlignment = Enum.VerticalAlignment.Center
+		layout.Parent = pill
+
+		local icon = Instance.new("ImageLabel")
+		icon.Name = "Icon"
+		icon.BackgroundTransparency = 1
+		icon.Size = UDim2.fromOffset(12, 12)
+		icon.ImageTransparency = 0.08
+		icon.Visible = TagSettings.Icon ~= nil
+		icon.Parent = pill
+		if TagSettings.Icon then MacLib:ApplyIcon(icon, TagSettings.Icon, TagSettings.IconColor or color) end
+
+		local title = Instance.new("TextLabel")
+		title.Name = "Title"
+		title.AutomaticSize = Enum.AutomaticSize.X
+		title.BackgroundTransparency = 1
+		title.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+		title.Size = UDim2.fromOffset(0, 16)
+		title.Text = tostring(TagSettings.Title or "TAG")
+		title.TextColor3 = Color3.fromRGB(245, 245, 245)
+		title.TextSize = 10
+		title.TextTransparency = 0.08
+		title.Parent = pill
+
+		pill.MouseEnter:Connect(function()
+			Tween(pill, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.68 }):Play()
+			Tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.2 }):Play()
+		end)
+		pill.MouseLeave:Connect(function()
+			Tween(pill, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.82 }):Play()
+			Tween(stroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.45 }):Play()
+		end)
+		pill.MouseButton1Click:Connect(function()
+			if TagSettings.Callback then task.spawn(TagSettings.Callback, TagFunctions) end
+		end)
+
+		function TagFunctions:SetTitle(value) title.Text = tostring(value or "") end
+		function TagFunctions:SetIcon(value, iconColor)
+			icon.Visible = value ~= nil and value ~= ""
+			return MacLib:ApplyIcon(icon, value, iconColor or color)
+		end
+		function TagFunctions:SetColor(value)
+			color = value
+			pill.BackgroundColor3 = value
+			stroke.Color = value
+			if TagSettings.Icon then icon.ImageColor3 = value end
+		end
+		function TagFunctions:SetVisible(value) pill.Visible = value == true end
+		function TagFunctions:Destroy() pill:Destroy() end
+		TagFunctions.Instance = pill
+		return TagFunctions
+	end
+
+	for _, tagSettings in ipairs(Settings.Tags or {}) do
+		WindowFunctions:Tag(tagSettings)
+	end
 
 	local userInfoUIPadding = Instance.new("UIPadding")
 	userInfoUIPadding.Name = "UserInfoUIPadding"
@@ -1721,10 +1916,11 @@ function MacLib:Window(Settings)
 			tabSwitcherUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 			tabSwitcherUIListLayout.Parent = tabSwitcher
 
-			if Settings.Image then
+			local tabIcon = Settings.Icon or Settings.Image
+			if tabIcon then
 				local tabImage = Instance.new("ImageLabel")
 				tabImage.Name = "TabImage"
-				tabImage.Image = Settings.Image
+				tabImage.Image = ""
 				tabImage.ImageTransparency = 0.4
 				tabImage.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 				tabImage.BackgroundTransparency = 1
@@ -1732,6 +1928,7 @@ function MacLib:Window(Settings)
 				tabImage.BorderSizePixel = 0
 				tabImage.Size = UDim2.fromOffset(16, 16)
 				tabImage.Parent = tabSwitcher
+				MacLib:ApplyIcon(tabImage, tabIcon, Settings.IconColor or Color3.fromRGB(255, 255, 255))
 			end
 
 			local tabSwitcherName = Instance.new("TextLabel")
@@ -1949,6 +2146,21 @@ function MacLib:Window(Settings)
 					buttonInteract.Parent = button
 					buttonInteract.Text = Settings.Name
 
+					local buttonLeadingIcon
+					if Settings.Icon then
+						buttonLeadingIcon = Instance.new("ImageLabel")
+						buttonLeadingIcon.Name = "LeadingIcon"
+						buttonLeadingIcon.AnchorPoint = Vector2.new(0, 0.5)
+						buttonLeadingIcon.Position = UDim2.new(0, 2, 0.5, 0)
+						buttonLeadingIcon.Size = UDim2.fromOffset(15, 15)
+						buttonLeadingIcon.BackgroundTransparency = 1
+						buttonLeadingIcon.ImageTransparency = 0.35
+						buttonLeadingIcon.Parent = button
+						MacLib:ApplyIcon(buttonLeadingIcon, Settings.Icon, Settings.IconColor or Color3.fromRGB(255, 255, 255))
+						buttonInteract.Position = UDim2.fromOffset(24, 0)
+						buttonInteract.Size = UDim2.new(1, -44, 1, 0)
+					end
+
 					local buttonImage = Instance.new("ImageLabel")
 					buttonImage.Name = "ButtonImage"
 					buttonImage.Image = assets.buttonImage
@@ -2012,6 +2224,21 @@ function MacLib:Window(Settings)
 					buttonInteract.MouseButton1Click:Connect(Callback)
 					function ButtonFunctions:UpdateName(Name)
 						buttonInteract.Text = Name
+					end
+					function ButtonFunctions:SetIcon(Icon, Color)
+						if not buttonLeadingIcon then
+							buttonLeadingIcon = Instance.new("ImageLabel")
+							buttonLeadingIcon.Name = "LeadingIcon"
+							buttonLeadingIcon.AnchorPoint = Vector2.new(0, 0.5)
+							buttonLeadingIcon.Position = UDim2.new(0, 2, 0.5, 0)
+							buttonLeadingIcon.Size = UDim2.fromOffset(15, 15)
+							buttonLeadingIcon.BackgroundTransparency = 1
+							buttonLeadingIcon.ImageTransparency = 0.35
+							buttonLeadingIcon.Parent = button
+							buttonInteract.Position = UDim2.fromOffset(24, 0)
+							buttonInteract.Size = UDim2.new(1, -44, 1, 0)
+						end
+						return MacLib:ApplyIcon(buttonLeadingIcon, Icon, Color or Color3.fromRGB(255, 255, 255))
 					end
 					function ButtonFunctions:SetVisibility(State)
 						button.Visible = State
@@ -5026,6 +5253,632 @@ function MacLib:Window(Settings)
 					return ColorpickerFunctions
 				end
 				
+				local function createModernCard(name, height)
+					local card = Instance.new("Frame")
+					card.Name = name
+					card.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					card.BackgroundTransparency = 0.955
+					card.BorderSizePixel = 0
+					card.Size = UDim2.new(1, 0, 0, height)
+					card.Parent = section
+
+					local corner = Instance.new("UICorner")
+					corner.CornerRadius = UDim.new(0, 6)
+					corner.Parent = card
+
+					local stroke = Instance.new("UIStroke")
+					stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+					stroke.Color = Color3.fromRGB(255, 255, 255)
+					stroke.Transparency = 0.91
+					stroke.Thickness = 1
+					stroke.Parent = card
+
+					return card, stroke
+				end
+
+				function SectionFunctions:ProgressBar(Settings)
+					Settings = Settings or {}
+					local ProgressFunctions = {}
+					local maximum = math.max(tonumber(Settings.Max) or 100, 0.001)
+					local value = math.clamp(tonumber(Settings.Value) or 0, 0, maximum)
+					local color = Settings.Color or accentColor
+					local card = createModernCard("ProgressBar", 58)
+
+					local title = Instance.new("TextLabel")
+					title.BackgroundTransparency = 1
+					title.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+					title.Position = UDim2.fromOffset(12, 8)
+					title.Size = UDim2.new(1, -80, 0, 18)
+					title.Text = tostring(Settings.Title or Settings.Name or "Progress")
+					title.TextColor3 = Color3.fromRGB(245, 245, 245)
+					title.TextSize = 13
+					title.TextTransparency = 0.22
+					title.TextXAlignment = Enum.TextXAlignment.Left
+					title.Parent = card
+
+					local valueText = Instance.new("TextLabel")
+					valueText.AnchorPoint = Vector2.new(1, 0)
+					valueText.BackgroundTransparency = 1
+					valueText.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+					valueText.Position = UDim2.new(1, -12, 0, 8)
+					valueText.Size = UDim2.fromOffset(64, 18)
+					valueText.TextColor3 = color
+					valueText.TextSize = 12
+					valueText.TextXAlignment = Enum.TextXAlignment.Right
+					valueText.Parent = card
+
+					local track = Instance.new("Frame")
+					track.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					track.BackgroundTransparency = 0.9
+					track.BorderSizePixel = 0
+					track.Position = UDim2.new(0, 12, 1, -18)
+					track.Size = UDim2.new(1, -24, 0, 5)
+					track.ClipsDescendants = true
+					track.Parent = card
+					local trackCorner = Instance.new("UICorner")
+					trackCorner.CornerRadius = UDim.new(1, 0)
+					trackCorner.Parent = track
+
+					local fill = Instance.new("Frame")
+					fill.BackgroundColor3 = color
+					fill.BorderSizePixel = 0
+					fill.Size = UDim2.fromScale(value / maximum, 1)
+					fill.Parent = track
+					local fillCorner = Instance.new("UICorner")
+					fillCorner.CornerRadius = UDim.new(1, 0)
+					fillCorner.Parent = fill
+
+					local function render(instant)
+						local ratio = math.clamp(value / maximum, 0, 1)
+						local suffix = Settings.Suffix
+						valueText.Text = suffix and (tostring(math.floor(value * 100 + 0.5) / 100) .. tostring(suffix)) or (tostring(math.floor(ratio * 100 + 0.5)) .. "%")
+						if instant then fill.Size = UDim2.fromScale(ratio, 1) else
+							Tween(fill, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = UDim2.fromScale(ratio, 1) }):Play()
+						end
+					end
+
+					function ProgressFunctions:SetValue(newValue)
+						value = math.clamp(tonumber(newValue) or value, 0, maximum)
+						render(false)
+					end
+					function ProgressFunctions:SetMax(newMax)
+						maximum = math.max(tonumber(newMax) or maximum, 0.001)
+						value = math.clamp(value, 0, maximum)
+						render(false)
+					end
+					function ProgressFunctions:SetColor(newColor)
+						color = newColor
+						fill.BackgroundColor3 = newColor
+						valueText.TextColor3 = newColor
+					end
+					function ProgressFunctions:SetTitle(newTitle) title.Text = tostring(newTitle or "") end
+					function ProgressFunctions:SetVisibility(state) card.Visible = state == true end
+					render(true)
+					return ProgressFunctions
+				end
+
+				function SectionFunctions:Status(Settings)
+					Settings = Settings or {}
+					local StatusFunctions = {}
+					local statusColor = Settings.Color or Color3.fromRGB(73, 209, 125)
+					local card, stroke = createModernCard("Status", 62)
+
+					local icon = Instance.new("ImageLabel")
+					icon.BackgroundColor3 = statusColor
+					icon.BackgroundTransparency = 0.83
+					icon.Position = UDim2.fromOffset(11, 13)
+					icon.Size = UDim2.fromOffset(36, 36)
+					icon.Parent = card
+					local iconCorner = Instance.new("UICorner")
+					iconCorner.CornerRadius = UDim.new(0, 9)
+					iconCorner.Parent = icon
+					MacLib:ApplyIcon(icon, Settings.Icon or "circle-check", Settings.IconColor or statusColor)
+
+					local title = Instance.new("TextLabel")
+					title.BackgroundTransparency = 1
+					title.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+					title.Position = UDim2.fromOffset(58, 11)
+					title.Size = UDim2.new(1, -130, 0, 19)
+					title.Text = tostring(Settings.Title or Settings.Name or "Status")
+					title.TextColor3 = Color3.fromRGB(248, 248, 248)
+					title.TextSize = 13
+					title.TextTransparency = 0.12
+					title.TextXAlignment = Enum.TextXAlignment.Left
+					title.Parent = card
+
+					local description = Instance.new("TextLabel")
+					description.BackgroundTransparency = 1
+					description.FontFace = Font.new(assets.interFont)
+					description.Position = UDim2.fromOffset(58, 31)
+					description.Size = UDim2.new(1, -70, 0, 18)
+					description.Text = tostring(Settings.Description or "Ready")
+					description.TextColor3 = Color3.fromRGB(255, 255, 255)
+					description.TextSize = 11
+					description.TextTransparency = 0.52
+					description.TextTruncate = Enum.TextTruncate.AtEnd
+					description.TextXAlignment = Enum.TextXAlignment.Left
+					description.Parent = card
+
+					local badge = Instance.new("TextLabel")
+					badge.AnchorPoint = Vector2.new(1, 0)
+					badge.AutomaticSize = Enum.AutomaticSize.X
+					badge.BackgroundColor3 = statusColor
+					badge.BackgroundTransparency = 0.82
+					badge.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+					badge.Position = UDim2.new(1, -11, 0, 12)
+					badge.Size = UDim2.fromOffset(0, 20)
+					badge.Text = tostring(Settings.Status or "ONLINE")
+					badge.TextColor3 = statusColor
+					badge.TextSize = 9
+					badge.Parent = card
+					local badgePadding = Instance.new("UIPadding")
+					badgePadding.PaddingLeft = UDim.new(0, 7)
+					badgePadding.PaddingRight = UDim.new(0, 7)
+					badgePadding.Parent = badge
+					local badgeCorner = Instance.new("UICorner")
+					badgeCorner.CornerRadius = UDim.new(1, 0)
+					badgeCorner.Parent = badge
+
+					function StatusFunctions:SetStatus(text, newColor)
+						badge.Text = tostring(text or "")
+						if newColor then
+							statusColor = newColor
+							badge.BackgroundColor3 = newColor
+							badge.TextColor3 = newColor
+							icon.BackgroundColor3 = newColor
+							icon.ImageColor3 = newColor
+							stroke.Color = newColor
+							stroke.Transparency = 0.82
+						end
+					end
+					function StatusFunctions:SetTitle(text) title.Text = tostring(text or "") end
+					function StatusFunctions:SetDescription(text) description.Text = tostring(text or "") end
+					function StatusFunctions:SetIcon(newIcon, newColor) return MacLib:ApplyIcon(icon, newIcon, newColor or statusColor) end
+					function StatusFunctions:SetVisibility(state) card.Visible = state == true end
+					return StatusFunctions
+				end
+
+				function SectionFunctions:ButtonRow(Settings)
+					Settings = Settings or {}
+					local RowFunctions = { Buttons = {} }
+					local row = Instance.new("Frame")
+					row.Name = "ButtonRow"
+					row.AutomaticSize = Enum.AutomaticSize.Y
+					row.BackgroundTransparency = 1
+					row.Size = UDim2.new(1, 0, 0, 34)
+					row.Parent = section
+					local layout = Instance.new("UIListLayout")
+					layout.FillDirection = Enum.FillDirection.Horizontal
+					layout.Padding = UDim.new(0, 7)
+					layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+					layout.SortOrder = Enum.SortOrder.LayoutOrder
+					layout.Parent = row
+
+					local buttons = Settings.Buttons or Settings.Values or {}
+					for index, buttonSettings in ipairs(buttons) do
+						local item = Instance.new("TextButton")
+						item.Name = "Action" .. index
+						item.AutoButtonColor = false
+						item.BackgroundColor3 = buttonSettings.Color or Color3.fromRGB(255, 255, 255)
+						item.BackgroundTransparency = buttonSettings.Color and 0.82 or 0.94
+						item.BorderSizePixel = 0
+						item.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+						item.Size = UDim2.new(1 / math.max(#buttons, 1), -7, 0, 34)
+						item.Text = ""
+						item.TextColor3 = Color3.fromRGB(245, 245, 245)
+						item.TextSize = 11
+						item.Parent = row
+						local itemCorner = Instance.new("UICorner")
+						itemCorner.CornerRadius = UDim.new(0, 6)
+						itemCorner.Parent = item
+						local itemStroke = Instance.new("UIStroke")
+						itemStroke.Color = buttonSettings.Color or Color3.fromRGB(255, 255, 255)
+						itemStroke.Transparency = 0.88
+						itemStroke.Parent = item
+						local itemTitle = Instance.new("TextLabel")
+						itemTitle.BackgroundTransparency = 1
+						itemTitle.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+						itemTitle.Position = UDim2.fromOffset(buttonSettings.Icon and 31 or 8, 0)
+						itemTitle.Size = UDim2.new(1, buttonSettings.Icon and -38 or -16, 1, 0)
+						itemTitle.Text = tostring(buttonSettings.Title or buttonSettings.Name or "Action")
+						itemTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
+						itemTitle.TextSize = 11
+						itemTitle.TextTruncate = Enum.TextTruncate.AtEnd
+						itemTitle.TextXAlignment = buttonSettings.Icon and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center
+						itemTitle.Parent = item
+						if buttonSettings.Icon then
+							local rowIcon = Instance.new("ImageLabel")
+							rowIcon.BackgroundTransparency = 1
+							rowIcon.Position = UDim2.fromOffset(9, 9)
+							rowIcon.Size = UDim2.fromOffset(16, 16)
+							rowIcon.Parent = item
+							MacLib:ApplyIcon(rowIcon, buttonSettings.Icon, buttonSettings.IconColor or buttonSettings.Color or Color3.fromRGB(220, 220, 220))
+						end
+						item.MouseEnter:Connect(function()
+							Tween(item, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { BackgroundTransparency = buttonSettings.Color and 0.7 or 0.88 }):Play()
+							Tween(itemStroke, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { Transparency = 0.62 }):Play()
+						end)
+						item.MouseLeave:Connect(function()
+							Tween(item, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { BackgroundTransparency = buttonSettings.Color and 0.82 or 0.94 }):Play()
+							Tween(itemStroke, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { Transparency = 0.88 }):Play()
+						end)
+						item.MouseButton1Click:Connect(function()
+							if buttonSettings.Callback then task.spawn(buttonSettings.Callback) end
+						end)
+						RowFunctions.Buttons[index] = item
+					end
+					function RowFunctions:SetVisibility(state) row.Visible = state == true end
+					function RowFunctions:SetEnabled(index, state)
+						local item = RowFunctions.Buttons[index]
+						if item then
+							item.Active = state == true
+							local label = item:FindFirstChildWhichIsA("TextLabel")
+							if label then label.TextTransparency = state and 0 or 0.55 end
+						end
+					end
+					return RowFunctions
+				end
+
+				function SectionFunctions:Code(Settings)
+					Settings = Settings or {}
+					local CodeFunctions = {}
+					local card = createModernCard("Code", tonumber(Settings.Height) or 92)
+					card.ClipsDescendants = true
+
+					local language = Instance.new("TextLabel")
+					language.BackgroundTransparency = 1
+					language.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+					language.Position = UDim2.fromOffset(11, 7)
+					language.Size = UDim2.new(1, -70, 0, 17)
+					language.Text = string.upper(tostring(Settings.Language or "LUAU"))
+					language.TextColor3 = accentColor
+					language.TextSize = 9
+					language.TextXAlignment = Enum.TextXAlignment.Left
+					language.Parent = card
+
+					local copy = Instance.new("TextButton")
+					copy.AnchorPoint = Vector2.new(1, 0)
+					copy.AutoButtonColor = false
+					copy.BackgroundTransparency = 1
+					copy.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+					copy.Position = UDim2.new(1, -10, 0, 6)
+					copy.Size = UDim2.fromOffset(45, 18)
+					copy.Text = "Copy"
+					copy.TextColor3 = Color3.fromRGB(255, 255, 255)
+					copy.TextSize = 10
+					copy.TextTransparency = 0.42
+					copy.Parent = card
+
+					local codeText = Instance.new("TextLabel")
+					codeText.BackgroundTransparency = 1
+					codeText.FontFace = Font.fromEnum(Enum.Font.Code)
+					codeText.Position = UDim2.fromOffset(11, 29)
+					codeText.Size = UDim2.new(1, -22, 1, -37)
+					codeText.Text = tostring(Settings.Code or Settings.Text or "")
+					codeText.TextColor3 = Color3.fromRGB(218, 224, 230)
+					codeText.TextSize = 11
+					codeText.TextTransparency = 0.16
+					codeText.TextTruncate = Enum.TextTruncate.AtEnd
+					codeText.TextWrapped = true
+					codeText.TextXAlignment = Enum.TextXAlignment.Left
+					codeText.TextYAlignment = Enum.TextYAlignment.Top
+					codeText.Parent = card
+
+					copy.MouseButton1Click:Connect(function()
+						local clipboard = setclipboard or toclipboard
+						if clipboard then pcall(clipboard, codeText.Text) end
+						copy.Text = "Copied"
+						task.delay(1.15, function() if copy.Parent then copy.Text = "Copy" end end)
+						if Settings.Callback then task.spawn(Settings.Callback, codeText.Text) end
+					end)
+					function CodeFunctions:SetCode(text) codeText.Text = tostring(text or "") end
+					function CodeFunctions:SetLanguage(text) language.Text = string.upper(tostring(text or "")) end
+					function CodeFunctions:SetVisibility(state) card.Visible = state == true end
+					return CodeFunctions
+				end
+
+				function SectionFunctions:AddDiscordBox(IdOrSettings, MaybeSettings)
+					local Settings
+					if type(IdOrSettings) == "table" then
+						Settings = IdOrSettings
+					else
+						Settings = MaybeSettings or {}
+						Settings.Id = Settings.Id or IdOrSettings
+					end
+					local DiscordFunctions = {}
+					local destroyed = false
+					local accent = Settings.Color or accentColor
+					local onlineColor = Settings.OnlineColor or Color3.fromRGB(79, 207, 128)
+
+					local function extractInviteCode(value)
+						value = tostring(value or "")
+						value = value:gsub("%s+", "")
+						local code = value:match("discord%.gg/([^/%?]+)")
+							or value:match("discord%.com/invite/([^/%?]+)")
+							or value:match("discordapp%.com/invite/([^/%?]+)")
+						if code then return code end
+						return value:match("^([^/%?]+)$")
+					end
+
+					local inviteCode = extractInviteCode(Settings.Code or Settings.InviteCode or Settings.Invite or Settings.Link or Settings.Url)
+					local inviteLink = tostring(Settings.Invite or Settings.Link or Settings.Url or "")
+					if inviteCode and not inviteLink:match("^https?://") then inviteLink = "https://discord.gg/" .. inviteCode end
+
+					local card, cardStroke = createModernCard("DiscordBox", 130)
+					card.BackgroundTransparency = 0.965
+					cardStroke.Transparency = 0.9
+
+					local top = Instance.new("Frame")
+					top.BackgroundTransparency = 1
+					top.Position = UDim2.fromOffset(12, 10)
+					top.Size = UDim2.new(1, -24, 0, 39)
+					top.Parent = card
+
+					local iconBack = Instance.new("Frame")
+					iconBack.BackgroundColor3 = accent
+					iconBack.BackgroundTransparency = 0.86
+					iconBack.BorderSizePixel = 0
+					iconBack.Size = UDim2.fromOffset(38, 38)
+					iconBack.Parent = top
+					local iconBackCorner = Instance.new("UICorner")
+					iconBackCorner.CornerRadius = UDim.new(0, 9)
+					iconBackCorner.Parent = iconBack
+
+					local icon = Instance.new("ImageLabel")
+					icon.AnchorPoint = Vector2.new(0.5, 0.5)
+					icon.BackgroundTransparency = 1
+					icon.Position = UDim2.fromScale(0.5, 0.5)
+					icon.Size = UDim2.fromOffset(19, 19)
+					icon.Parent = iconBack
+					MacLib:ApplyIcon(icon, Settings.Icon or "messages-square", Settings.IconColor or accent)
+
+					local title = Instance.new("TextLabel")
+					title.BackgroundTransparency = 1
+					title.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+					title.Position = UDim2.fromOffset(49, 1)
+					title.Size = UDim2.new(1, -105, 0, 19)
+					title.Text = tostring(Settings.Title or Settings.Name or "Discord Community")
+					title.TextColor3 = Color3.fromRGB(248, 248, 248)
+					title.TextSize = 13
+					title.TextTransparency = 0.1
+					title.TextTruncate = Enum.TextTruncate.AtEnd
+					title.TextXAlignment = Enum.TextXAlignment.Left
+					title.Parent = top
+
+					local subtitle = Instance.new("TextLabel")
+					subtitle.BackgroundTransparency = 1
+					subtitle.FontFace = Font.new(assets.interFont)
+					subtitle.Position = UDim2.fromOffset(49, 20)
+					subtitle.Size = UDim2.new(1, -105, 0, 16)
+					subtitle.Text = tostring(Settings.Description or Settings.Subtitle or (inviteCode and ("discord.gg/" .. inviteCode) or "Community server"))
+					subtitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+					subtitle.TextSize = 10
+					subtitle.TextTransparency = 0.58
+					subtitle.TextTruncate = Enum.TextTruncate.AtEnd
+					subtitle.TextXAlignment = Enum.TextXAlignment.Left
+					subtitle.Parent = top
+
+					local refresh = Instance.new("TextButton")
+					refresh.AnchorPoint = Vector2.new(1, 0.5)
+					refresh.AutoButtonColor = false
+					refresh.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					refresh.BackgroundTransparency = 0.95
+					refresh.BorderSizePixel = 0
+					refresh.Position = UDim2.new(1, 0, 0.5, 0)
+					refresh.Size = UDim2.fromOffset(32, 32)
+					refresh.Text = ""
+					refresh.Parent = top
+					local refreshCorner = Instance.new("UICorner")
+					refreshCorner.CornerRadius = UDim.new(0, 8)
+					refreshCorner.Parent = refresh
+					local refreshStroke = Instance.new("UIStroke")
+					refreshStroke.Color = Color3.fromRGB(255, 255, 255)
+					refreshStroke.Transparency = 0.9
+					refreshStroke.Parent = refresh
+					local refreshIcon = Instance.new("ImageLabel")
+					refreshIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+					refreshIcon.BackgroundTransparency = 1
+					refreshIcon.Position = UDim2.fromScale(0.5, 0.5)
+					refreshIcon.Size = UDim2.fromOffset(14, 14)
+					refreshIcon.Parent = refresh
+					MacLib:ApplyIcon(refreshIcon, "refresh-cw", Color3.fromRGB(205, 205, 210))
+
+					local stats = Instance.new("Frame")
+					stats.BackgroundTransparency = 1
+					stats.Position = UDim2.fromOffset(12, 58)
+					stats.Size = UDim2.new(1, -24, 0, 31)
+					stats.Parent = card
+					local statsLayout = Instance.new("UIListLayout")
+					statsLayout.FillDirection = Enum.FillDirection.Horizontal
+					statsLayout.Padding = UDim.new(0, 7)
+					statsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					statsLayout.Parent = stats
+
+					local function makeStat(name, labelText, dotColor)
+						local stat = Instance.new("Frame")
+						stat.Name = name
+						stat.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+						stat.BackgroundTransparency = 0.965
+						stat.BorderSizePixel = 0
+						stat.Size = UDim2.new(0.5, -4, 1, 0)
+						stat.Parent = stats
+						local statCorner = Instance.new("UICorner")
+						statCorner.CornerRadius = UDim.new(0, 7)
+						statCorner.Parent = stat
+						local statStroke = Instance.new("UIStroke")
+						statStroke.Color = Color3.fromRGB(255, 255, 255)
+						statStroke.Transparency = 0.92
+						statStroke.Parent = stat
+
+						local dot = Instance.new("Frame")
+						dot.AnchorPoint = Vector2.new(0, 0.5)
+						dot.BackgroundColor3 = dotColor
+						dot.BorderSizePixel = 0
+						dot.Position = UDim2.new(0, 9, 0.5, 0)
+						dot.Size = UDim2.fromOffset(6, 6)
+						dot.Parent = stat
+						local dotCorner = Instance.new("UICorner")
+						dotCorner.CornerRadius = UDim.new(1, 0)
+						dotCorner.Parent = dot
+
+						local label = Instance.new("TextLabel")
+						label.BackgroundTransparency = 1
+						label.FontFace = Font.new(assets.interFont)
+						label.Position = UDim2.fromOffset(21, 0)
+						label.Size = UDim2.new(0.62, -21, 1, 0)
+						label.Text = labelText
+						label.TextColor3 = Color3.fromRGB(255, 255, 255)
+						label.TextSize = 10
+						label.TextTransparency = 0.54
+						label.TextXAlignment = Enum.TextXAlignment.Left
+						label.Parent = stat
+
+						local value = Instance.new("TextLabel")
+						value.AnchorPoint = Vector2.new(1, 0)
+						value.BackgroundTransparency = 1
+						value.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+						value.Position = UDim2.new(1, -9, 0, 0)
+						value.Size = UDim2.new(0.38, 0, 1, 0)
+						value.Text = "--"
+						value.TextColor3 = Color3.fromRGB(238, 238, 240)
+						value.TextSize = 11
+						value.TextXAlignment = Enum.TextXAlignment.Right
+						value.Parent = stat
+						return value, dot
+					end
+
+					local onlineValue, onlineDot = makeStat("Online", Settings.OnlineText or "Online", onlineColor)
+					local totalValue = makeStat("Members", Settings.MemberText or "Members", Color3.fromRGB(154, 158, 168))
+
+					local copy = Instance.new("TextButton")
+					copy.AutoButtonColor = false
+					copy.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					copy.BackgroundTransparency = 0.94
+					copy.BorderSizePixel = 0
+					copy.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+					copy.Position = UDim2.new(0, 12, 1, -32)
+					copy.Size = UDim2.new(1, -24, 0, 24)
+					copy.Text = tostring(Settings.ButtonText or "Copy Discord Invite")
+					copy.TextColor3 = Color3.fromRGB(240, 240, 242)
+					copy.TextSize = 10
+					copy.TextTransparency = 0.22
+					copy.Parent = card
+					local copyCorner = Instance.new("UICorner")
+					copyCorner.CornerRadius = UDim.new(0, 7)
+					copyCorner.Parent = copy
+					local copyStroke = Instance.new("UIStroke")
+					copyStroke.Color = Color3.fromRGB(255, 255, 255)
+					copyStroke.Transparency = 0.88
+					copyStroke.Parent = copy
+					local copyIcon = Instance.new("ImageLabel")
+					copyIcon.AnchorPoint = Vector2.new(0, 0.5)
+					copyIcon.BackgroundTransparency = 1
+					copyIcon.Position = UDim2.new(0, 9, 0.5, 0)
+					copyIcon.Size = UDim2.fromOffset(12, 12)
+					copyIcon.Parent = copy
+					MacLib:ApplyIcon(copyIcon, "copy", Color3.fromRGB(190, 192, 198))
+
+					local function setLoading(state)
+						refresh.Active = not state
+						if state then
+							refreshIcon.ImageColor3 = accent
+							onlineValue.Text = "..."
+							totalValue.Text = "..."
+						else
+							refreshIcon.ImageColor3 = Color3.fromRGB(205, 205, 210)
+						end
+					end
+
+					function DiscordFunctions:SetCounts(online, total)
+						onlineValue.Text = tostring(online ~= nil and online or "--")
+						totalValue.Text = tostring(total ~= nil and total or "--")
+						onlineDot.BackgroundColor3 = online ~= nil and onlineColor or Color3.fromRGB(154, 158, 168)
+					end
+
+					function DiscordFunctions:SetInvite(value)
+						inviteCode = extractInviteCode(value)
+						inviteLink = tostring(value or "")
+						if inviteCode and not inviteLink:match("^https?://") then inviteLink = "https://discord.gg/" .. inviteCode end
+						if inviteCode and not Settings.Description and not Settings.Subtitle then subtitle.Text = "discord.gg/" .. inviteCode end
+					end
+
+					function DiscordFunctions:Refresh()
+						if destroyed or not inviteCode or inviteCode == "" then
+							DiscordFunctions:SetCounts(nil, nil)
+							return false
+						end
+						setLoading(true)
+						task.spawn(function()
+							local ok, data = pcall(function()
+								local raw = game:HttpGet("https://discord.com/api/v10/invites/" .. inviteCode .. "?with_counts=true&with_expiration=true")
+								return HttpService:JSONDecode(raw)
+							end)
+							if destroyed then return end
+							setLoading(false)
+							if ok and type(data) == "table" then
+								DiscordFunctions:SetCounts(data.approximate_presence_count, data.approximate_member_count)
+								if Settings.UseGuildName == true and data.guild and data.guild.name then title.Text = tostring(data.guild.name) end
+								if Settings.Callback then task.spawn(Settings.Callback, data) end
+							else
+								DiscordFunctions:SetCounts(nil, nil)
+								if Settings.ErrorCallback then task.spawn(Settings.ErrorCallback, data) end
+							end
+						end)
+						return true
+					end
+
+					function DiscordFunctions:SetTitle(value) title.Text = tostring(value or "") end
+					function DiscordFunctions:SetDescription(value) subtitle.Text = tostring(value or "") end
+					function DiscordFunctions:SetVisibility(state) card.Visible = state == true end
+					function DiscordFunctions:Destroy() destroyed = true; card:Destroy() end
+
+					copy.MouseEnter:Connect(function()
+						Tween(copy, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.89 }):Play()
+						Tween(copyStroke, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { Transparency = 0.72 }):Play()
+					end)
+					copy.MouseLeave:Connect(function()
+						Tween(copy, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.94 }):Play()
+						Tween(copyStroke, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { Transparency = 0.88 }):Play()
+					end)
+					copy.MouseButton1Click:Connect(function()
+						local clipboard = setclipboard or toclipboard
+						if clipboard and inviteLink ~= "" then pcall(clipboard, inviteLink) end
+						local previous = copy.Text
+						copy.Text = clipboard and "Invite Copied" or "Clipboard Unavailable"
+						task.delay(1.25, function() if copy.Parent then copy.Text = previous end end)
+						if Settings.CopyCallback then task.spawn(Settings.CopyCallback, inviteLink) end
+					end)
+					refresh.MouseButton1Click:Connect(function() DiscordFunctions:Refresh() end)
+					refresh.MouseEnter:Connect(function()
+						Tween(refresh, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.89 }):Play()
+					end)
+					refresh.MouseLeave:Connect(function()
+						Tween(refresh, TweenInfo.new(0.14, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.95 }):Play()
+					end)
+
+					if inviteCode and inviteCode ~= "" then
+						DiscordFunctions:Refresh()
+					else
+						DiscordFunctions:SetCounts(Settings.Online or Settings.OnlineMembers, Settings.Members or Settings.TotalMembers)
+					end
+					local autoRefreshInterval = tonumber(Settings.AutoRefresh) or (Settings.AutoRefresh == true and 60 or nil)
+					if autoRefreshInterval then
+						local interval = math.max(autoRefreshInterval, 30)
+						task.spawn(function()
+							while not destroyed and card.Parent do
+								task.wait(interval)
+								if not destroyed and card.Parent then DiscordFunctions:Refresh() end
+							end
+						end)
+					end
+
+					return DiscordFunctions
+				end
+
+				function SectionFunctions:DiscordBox(Settings)
+					return self:AddDiscordBox(Settings or {})
+				end
+
 				function SectionFunctions:Header(Settings)
 					local HeaderFunctions = {}
 					
@@ -5066,12 +5919,31 @@ function MacLib:Window(Settings)
 					headerText.BorderSizePixel = 0
 					headerText.Size = UDim2.fromScale(1, 0)
 					headerText.Parent = header
+
+					local headerIcon
+					if Settings.Icon then
+						headerIcon = Instance.new("ImageLabel")
+						headerIcon.Name = "HeaderIcon"
+						headerIcon.AnchorPoint = Vector2.new(0, 0)
+						headerIcon.Position = UDim2.fromOffset(0, 1)
+						headerIcon.Size = UDim2.fromOffset(16, 16)
+						headerIcon.BackgroundTransparency = 1
+						headerIcon.ImageTransparency = 0.25
+						headerIcon.Parent = header
+						MacLib:ApplyIcon(headerIcon, Settings.Icon, Settings.IconColor or accentColor)
+						headerText.Position = UDim2.fromOffset(23, 0)
+						headerText.Size = UDim2.new(1, -23, 0, 0)
+					end
 					
 					function HeaderFunctions:UpdateName(New)
 						headerText.Text = New
 					end
 					function HeaderFunctions:SetVisibility(State)
 						header.Visible = State
+					end
+					function HeaderFunctions:SetIcon(Icon, Color)
+						if not headerIcon then return false end
+						return MacLib:ApplyIcon(headerIcon, Icon, Color or accentColor)
 					end
 					
 					return HeaderFunctions
@@ -5882,12 +6754,18 @@ function MacLib:Window(Settings)
 		return notifications.Visible
 	end
 
+	local openButtonContainer
+	local openButtonEnabled = true
+
 	function WindowFunctions:SetState(State)
 		windowState = State
 		if State then
 			playWindowOpen()
 		else
 			playWindowClose()
+		end
+		if openButtonContainer then
+			openButtonContainer.Visible = openButtonEnabled and not State
 		end
 	end
 
@@ -5918,6 +6796,177 @@ function MacLib:Window(Settings)
 			Description = (state and "Maximized " or "Minimized ") .. "the menu. Use " .. tostring(MenuKeybind.Name) .. " to toggle it.",
 			Lifetime = 5
 		})
+	end
+
+	-- Floating launcher: intentionally separate from the main window so it remains
+	-- accessible after minimizing, while retaining MacLib's restrained visual style.
+	do
+		local openSettings = Settings.OpenButton
+		if openSettings ~= false then
+			if type(openSettings) ~= "table" then openSettings = {} end
+			openButtonEnabled = openSettings.Enabled ~= false
+			local openColor = openSettings.Color or accentColor
+
+			openButtonContainer = Instance.new("Frame")
+			openButtonContainer.Name = "OpenButtonContainer"
+			openButtonContainer.AnchorPoint = Vector2.new(0.5, 1)
+			openButtonContainer.BackgroundTransparency = 1
+			openButtonContainer.Position = openSettings.Position or UDim2.new(0.5, 0, 1, -26)
+			openButtonContainer.Size = UDim2.fromOffset(142, 42)
+			openButtonContainer.Visible = openButtonEnabled and not windowState
+			openButtonContainer.ZIndex = 250
+			openButtonContainer.Parent = macLib
+
+			local glow = Instance.new("Frame")
+			glow.Name = "Glow"
+			glow.AnchorPoint = Vector2.new(0.5, 0.5)
+			glow.BackgroundColor3 = openColor
+			glow.BackgroundTransparency = 0.88
+			glow.BorderSizePixel = 0
+			glow.Position = UDim2.fromScale(0.5, 0.5)
+			glow.Size = UDim2.new(1, 8, 1, 8)
+			glow.ZIndex = 250
+			glow.Parent = openButtonContainer
+			local glowCorner = Instance.new("UICorner")
+			glowCorner.CornerRadius = UDim.new(1, 0)
+			glowCorner.Parent = glow
+
+			local launcher = Instance.new("TextButton")
+			launcher.Name = "OpenButton"
+			launcher.AutoButtonColor = false
+			launcher.BackgroundColor3 = Color3.fromRGB(14, 15, 18)
+			launcher.BackgroundTransparency = 0.08
+			launcher.BorderSizePixel = 0
+			launcher.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+			launcher.Position = UDim2.fromOffset(0, 0)
+			launcher.Size = UDim2.fromScale(1, 1)
+			launcher.Text = ""
+			launcher.TextColor3 = Color3.fromRGB(245, 245, 245)
+			launcher.TextSize = 12
+			launcher.ZIndex = 252
+			launcher.Parent = openButtonContainer
+			local launcherCorner = Instance.new("UICorner")
+			launcherCorner.CornerRadius = UDim.new(1, 0)
+			launcherCorner.Parent = launcher
+			local launcherStroke = Instance.new("UIStroke")
+			launcherStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			launcherStroke.Color = openColor
+			launcherStroke.Transparency = 0.48
+			launcherStroke.Thickness = 1
+			launcherStroke.Parent = launcher
+
+			local launcherIconBack = Instance.new("Frame")
+			launcherIconBack.Name = "IconBack"
+			launcherIconBack.BackgroundColor3 = openColor
+			launcherIconBack.BackgroundTransparency = 0.79
+			launcherIconBack.BorderSizePixel = 0
+			launcherIconBack.Position = UDim2.fromOffset(7, 7)
+			launcherIconBack.Size = UDim2.fromOffset(28, 28)
+			launcherIconBack.ZIndex = 253
+			launcherIconBack.Parent = launcher
+			local launcherIconCorner = Instance.new("UICorner")
+			launcherIconCorner.CornerRadius = UDim.new(1, 0)
+			launcherIconCorner.Parent = launcherIconBack
+
+			local launcherTitle = Instance.new("TextLabel")
+			launcherTitle.Name = "Title"
+			launcherTitle.BackgroundTransparency = 1
+			launcherTitle.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
+			launcherTitle.Position = UDim2.fromOffset(43, 0)
+			launcherTitle.Size = UDim2.new(1, -53, 1, 0)
+			launcherTitle.Text = tostring(openSettings.Title or "Open Menu")
+			launcherTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
+			launcherTitle.TextSize = 12
+			launcherTitle.TextTruncate = Enum.TextTruncate.AtEnd
+			launcherTitle.TextXAlignment = Enum.TextXAlignment.Left
+			launcherTitle.ZIndex = 253
+			launcherTitle.Parent = launcher
+
+			local launcherIcon = Instance.new("ImageLabel")
+			launcherIcon.Name = "Icon"
+			launcherIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+			launcherIcon.BackgroundTransparency = 1
+			launcherIcon.Position = UDim2.fromScale(0.5, 0.5)
+			launcherIcon.Size = UDim2.fromOffset(15, 15)
+			launcherIcon.ZIndex = 254
+			launcherIcon.Parent = launcherIconBack
+			MacLib:ApplyIcon(launcherIcon, openSettings.Icon or "panel-left-open", openSettings.IconColor or openColor)
+
+			launcher.MouseEnter:Connect(function()
+				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0 }):Play()
+				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.18 }):Play()
+				Tween(glow, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.79 }):Play()
+			end)
+			launcher.MouseLeave:Connect(function()
+				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.08 }):Play()
+				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.48 }):Play()
+				Tween(glow, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.88 }):Play()
+			end)
+
+			local dragging = false
+			local dragInput
+			local dragStart
+			local startPosition
+			local moved = false
+			if openSettings.Draggable ~= false then
+				launcher.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+						dragging = true
+						moved = false
+						dragStart = input.Position
+						startPosition = openButtonContainer.Position
+						input.Changed:Connect(function()
+							if input.UserInputState == Enum.UserInputState.End then dragging = false end
+						end)
+					end
+				end)
+				launcher.InputChanged:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+				end)
+				UserInputService.InputChanged:Connect(function(input)
+					if dragging and input == dragInput then
+						local delta = input.Position - dragStart
+						if delta.Magnitude > 4 then moved = true end
+						openButtonContainer.Position = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + delta.X, startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
+					end
+				end)
+			end
+
+			launcher.MouseButton1Click:Connect(function()
+				if moved then moved = false; return end
+				ToggleMenu()
+			end)
+
+			if openSettings.Bobbing ~= false then
+				task.spawn(function()
+					while launcher.Parent and macLib.Parent do
+						local up = Tween(launcher, TweenInfo.new(1.05, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(0, -3) })
+						up:Play(); up.Completed:Wait()
+						if not launcher.Parent then break end
+						local down = Tween(launcher, TweenInfo.new(1.05, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(0, 0) })
+						down:Play(); down.Completed:Wait()
+					end
+				end)
+			end
+
+			function WindowFunctions:EditOpenButton(config)
+				config = config or {}
+				if config.Title ~= nil then launcherTitle.Text = tostring(config.Title) end
+				if config.Icon ~= nil then MacLib:ApplyIcon(launcherIcon, config.Icon, config.IconColor or openColor) end
+				if config.Color ~= nil then
+					openColor = config.Color
+					glow.BackgroundColor3 = openColor
+					launcherStroke.Color = openColor
+					launcherIconBack.BackgroundColor3 = openColor
+					launcherIcon.ImageColor3 = config.IconColor or openColor
+				end
+				if config.Position ~= nil then openButtonContainer.Position = config.Position end
+				if config.Enabled ~= nil then
+					openButtonEnabled = config.Enabled == true
+					openButtonContainer.Visible = openButtonEnabled and not windowState
+				end
+			end
+		end
 	end
 
 	UserInputService.InputEnded:Connect(function(inp, gpe)
@@ -6014,6 +7063,18 @@ function MacLib:Demo()
 		ShowUserInfo = true,
 		Keybind = Enum.KeyCode.RightControl,
 		AcrylicBlur = true,
+		Tags = {
+			{ Title = "PREMIUM", Icon = "crown", Color = Color3.fromRGB(245, 186, 73) },
+			{ Title = "BETA", Icon = "flask-conical", Color = Color3.fromRGB(109, 141, 255) },
+			{ Title = "SECURE", Icon = "shield-check", Color = Color3.fromRGB(72, 205, 133) },
+		},
+		OpenButton = {
+			Enabled = true,
+			Title = "Open Menu",
+			Icon = "panel-left-open",
+			Draggable = true,
+			Bobbing = true,
+		},
 	})
 
 	local globalSettings = {
@@ -6060,15 +7121,78 @@ function MacLib:Demo()
 	}
 
 	local tabs = {
-		Main = tabGroups.TabGroup1:Tab({ Name = "Demo", Image = "rbxassetid://18821914323" })
+		Main = tabGroups.TabGroup1:Tab({ Name = "Named Icon", Icon = "sparkles" }),
+		AssetIcon = tabGroups.TabGroup1:Tab({ Name = "Asset Icon", Image = "rbxassetid://18821914323" }),
 	}
 	
 	local sections = {
-		MainSection1 = tabs.Main:Section({ Side = "Left" })
+		MainSection1 = tabs.Main:Section({ Side = "Left" }),
+		AssetIconSection = tabs.AssetIcon:Section({ Side = "Left" }),
 	}
 
 	sections.MainSection1:Header({
-		Name = "Header #1"
+		Name = "Modern Components",
+		Icon = "layout-dashboard"
+	})
+
+	sections.MainSection1:Status({
+		Title = "Service Status",
+		Description = "All systems are ready",
+		Status = "ONLINE",
+		Icon = "circle-check",
+	})
+
+	sections.MainSection1:ProgressBar({
+		Title = "Loading Assets",
+		Value = 72,
+		Max = 100,
+	})
+
+	sections.MainSection1:ButtonRow({
+		Buttons = {
+			{ Title = "Refresh", Icon = "refresh-cw", Callback = function() print("Refresh") end },
+			{ Title = "Share", Icon = "share-2", Callback = function() print("Share") end },
+			{ Title = "Settings", Icon = "settings", Callback = function() print("Settings") end },
+		}
+	})
+
+	sections.MainSection1:Code({
+		Language = "Luau",
+		Code = [=[-- Named Lucide icon
+TabGroup:Tab({ Name = "Home", Icon = "house" })
+
+-- Direct Roblox asset (Icon or legacy Image both work)
+TabGroup:Tab({ Name = "Custom", Icon = "rbxassetid://18821914323" })]=],
+	})
+
+	sections.MainSection1:AddDiscordBox("MacLibDiscord", {
+		Title = "MacLib Community",
+		Description = "News, support and updates",
+		Invite = "https://discord.gg/n4DbXTyNPj",
+		Icon = "messages-square",
+		ButtonText = "Copy Discord Invite",
+	})
+
+	sections.AssetIconSection:Header({
+		Name = "Direct Asset Test",
+		Icon = "rbxassetid://18821914323",
+	})
+
+	sections.AssetIconSection:Paragraph({
+		Header = "Compatibility",
+		Body = "This tab, header and button use a direct rbxassetid while the first tab uses Lucide icon names.",
+	})
+
+	sections.AssetIconSection:Button({
+		Name = "Asset Icon Button",
+		Icon = "rbxassetid://18821914323",
+		Callback = function()
+			Window:Notify({
+				Title = "Asset icon works",
+				Description = "MacLib accepts both named icons and rbxassetid values.",
+				Lifetime = 4,
+			})
+		end,
 	})
 
 	sections.MainSection1:Button({
@@ -6475,6 +7599,8 @@ do
 			local control
 			control = patchControl(nativeButton(self, {
 				Name = toName(opts, "Button"),
+				Icon = opts.Icon,
+				IconColor = opts.IconColor,
 				Tooltip = opts.Tooltip,
 				Callback = toCallback(opts),
 			}), "Button")
@@ -6626,8 +7752,17 @@ do
 
 		local nativeHeader = section.Header
 		section.AddSectionHeader = section.AddSectionHeader or function(self, opts)
-			return patchControl(nativeHeader(self, { Text = toName(opts, "Header") }), "Header")
+			opts = opts or {}
+			return patchControl(nativeHeader(self, {
+				Text = toName(opts, "Header"),
+				Icon = opts.Icon,
+				IconColor = opts.IconColor,
+			}), "Header")
 		end
+		section.AddProgressBar = section.AddProgressBar or function(self, opts) return self:ProgressBar(opts or {}) end
+		section.AddStatus = section.AddStatus or function(self, opts) return self:Status(opts or {}) end
+		section.AddButtonRow = section.AddButtonRow or function(self, opts) return self:ButtonRow(opts or {}) end
+		section.AddCode = section.AddCode or function(self, opts) return self:Code(opts or {}) end
 		section.AddDivider = section.AddDivider or function(self) return self:Divider() end
 		section.AddSpacer = section.AddSpacer or function(self) return self:Spacer() end
 
@@ -6793,9 +7928,14 @@ do
 			Subtitle = tostring(first(settings.Subtitle, settings.SubTitle, settings.Description, "")),
 			Size = settings.Size,
 			Accent = settings.Accent,
+			DragStyle = settings.DragStyle,
+			ShowUserInfo = settings.ShowUserInfo,
 			AcrylicBlur = settings.AcrylicBlur,
 			DisabledWindowControls = settings.DisabledWindowControls,
 			WindowControls = settings.WindowControls,
+			Keybind = settings.Keybind,
+			Tags = settings.Tags,
+			OpenButton = settings.OpenButton,
 		})
 		self.__LastWindow = patchWindow(window)
 		self.Window = self.__LastWindow
