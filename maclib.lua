@@ -7356,60 +7356,6 @@ function MacLib:Window(Settings)
 		return footerFrame
 	end
 
-	function WindowFunctions:AddWatermark(Segments)
-		local WatermarkFunctions = {}
-		local watermark = Instance.new("TextButton")
-		watermark.Name = "Watermark"
-		watermark.AutoButtonColor = false
-		watermark.AutomaticSize = Enum.AutomaticSize.X
-		watermark.BackgroundColor3 = Color3.fromRGB(12, 12, 14)
-		watermark.BackgroundTransparency = 0.16
-		watermark.BorderSizePixel = 0
-		watermark.Position = UDim2.fromOffset(12, 10)
-		watermark.Size = UDim2.fromOffset(0, 25)
-		watermark.Text = ""
-		watermark.ZIndex = 300
-		watermark.Parent = macLib
-		local watermarkCorner = Instance.new("UICorner")
-		watermarkCorner.CornerRadius = UDim.new(0, 7)
-		watermarkCorner.Parent = watermark
-		local watermarkStroke = Instance.new("UIStroke")
-		watermarkStroke.Color = Color3.fromRGB(255, 255, 255)
-		watermarkStroke.Transparency = 0.88
-		watermarkStroke.Parent = watermark
-		local watermarkPadding = Instance.new("UIPadding")
-		watermarkPadding.PaddingLeft = UDim.new(0, 9)
-		watermarkPadding.PaddingRight = UDim.new(0, 9)
-		watermarkPadding.Parent = watermark
-		local label = Instance.new("TextLabel")
-		label.AutomaticSize = Enum.AutomaticSize.X
-		label.BackgroundTransparency = 1
-		label.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
-		label.Size = UDim2.fromOffset(0, 25)
-		label.TextColor3 = Color3.fromRGB(235, 236, 240)
-		label.TextSize = 10
-		label.TextTransparency = 0.22
-		label.ZIndex = 301
-		label.Parent = watermark
-		local copyValue
-		local function update(Value)
-			local text, copy = flattenSegments(Value)
-			label.Text = text
-			copyValue = copy
-		end
-		watermark.MouseButton1Click:Connect(function()
-			local clipboard = setclipboard or toclipboard
-			if clipboard and copyValue then pcall(clipboard, copyValue) end
-		end)
-		function WatermarkFunctions:SetVisible(State) watermark.Visible = State == true end
-		function WatermarkFunctions:SetText(Value) update(Value) end
-		function WatermarkFunctions:SetSegments(Value) update(Value) end
-		function WatermarkFunctions:Destroy() watermark:Destroy() end
-		WatermarkFunctions.Instance = watermark
-		update(Segments)
-		return WatermarkFunctions
-	end
-
 	function WindowFunctions:SetCompact(State)
 		WindowFunctions.Compact = State == true
 		return WindowFunctions.Compact
@@ -8426,12 +8372,6 @@ do
 			self.__LastWindow:SetAccent(self.Scheme.AccentColor)
 		end
 		return self.Scheme
-	end
-
-	function MacLib:AddWatermark(Segments)
-		if self.__LastWindow and self.__LastWindow.AddWatermark then
-			return self.__LastWindow:AddWatermark(Segments)
-		end
 	end
 
 	function MacLib:Notify(opts)
