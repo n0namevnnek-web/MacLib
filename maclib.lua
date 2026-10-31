@@ -8334,7 +8334,9 @@ do
 				Name = toName(opts, "Dropdown"),
 				Options = options,
 				Multi = multi,
-				Search = opts.Search == true or opts.Searchable == true,
+				-- Every dropdown is searchable by default. This keeps large NPC,
+				-- island, quest, fish, and item lists practical on PC and mobile.
+				Search = true,
 				Required = opts.Required ~= false,
 				Default = normalizeDefault(first(opts.Default, opts.Value, opts.CurrentOption), options, multi),
 				Callback = callbackProxy(userCallback, function() return control end),
