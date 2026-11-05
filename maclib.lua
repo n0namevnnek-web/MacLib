@@ -850,7 +850,7 @@ function MacLib:Window(Settings)
 			color = value
 			pill.BackgroundColor3 = value
 			stroke.Color = value
-			if TagSettings.Icon then icon.ImageColor3 = value end
+                        if TagSettings.Icon then icon.ImageColor3 = TagSettings.IconColor or Color3.fromRGB(255, 255, 255) end
 		end
 		function TagFunctions:SetVisible(value) pill.Visible = value == true end
 		function TagFunctions:Destroy() pill:Destroy() end
