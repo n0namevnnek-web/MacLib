@@ -5818,6 +5818,18 @@ function MacLib:Window(Settings)
 						icon.ImageColor3 = Settings.IconColor or Color3.fromRGB(255, 255, 255)
 						icon.ImageTransparency = 0
 						icon.Visible = true
+						if Settings.FallbackIcon then
+							task.spawn(function()
+								local loaded = pcall(function()
+									ContentProvider:PreloadAsync({ icon })
+								end)
+								if icon.Parent and (not loaded or not icon.IsLoaded) then
+									MacLib:ApplyIcon(icon, Settings.FallbackIcon, Settings.FallbackIconColor or Color3.fromRGB(255,255,255))
+									icon.ImageTransparency = 0
+									icon.Visible = true
+								end
+							end)
+						end
 					else
 						MacLib:ApplyIcon(icon, rawDiscordIcon, Settings.IconColor or Color3.fromRGB(225, 227, 232))
 					end
@@ -8668,12 +8680,18 @@ do
 		local nativeNotify = window.Notify
 		function window:Notify(opts)
 			opts = opts or {}
-			return patchControl(nativeNotify(self, {
+			local payload = {
 				Title = tostring(first(opts.Title, opts.Name, "Notification")),
 				Description = tostring(first(opts.Description, opts.Desc, opts.Content, opts.Text, "")),
 				Lifetime = first(opts.Lifetime, opts.Duration, opts.Time, 5),
 				Callback = toCallback(opts),
-			}), "Notification")
+			}
+			-- Several executors expose Instance creation only to deferred UI
+			-- threads. Queue notifications instead of constructing them in the
+			-- caller's Heartbeat/loadstring thread.
+			task.defer(function()
+				pcall(function() patchControl(nativeNotify(self, payload), "Notification") end)
+			end)
 		end
 
 		local nativeDialog = window.Dialog
@@ -8691,11 +8709,12 @@ do
 				if #buttons == 0 then
 					buttons = {{ Name = "OK", Title = "OK" }}
 				end
-				return nativeDialog(self, {
+				local payload = {
 					Title = tostring(first(opts.Title, opts.Name, "Dialog")),
 					Description = tostring(first(opts.Description, opts.Content, opts.Text, "")),
 					Buttons = buttons,
-				})
+				}
+				task.defer(function() pcall(function() nativeDialog(self, payload) end) end)
 			end
 		end
 
