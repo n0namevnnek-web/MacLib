@@ -7656,6 +7656,119 @@ function MacLib:Window(Settings)
 		end
 	end
 
+	-- Window lock overlay. This mirrors the simple WindUI-style lock while
+	-- allowing scripts to replace the generic "Locked" text (for example,
+	-- Window:Lock({ Title = "Premium Only" })).
+	local lockOverlay
+	local lockTitle
+	local lockDescription
+	local lockIcon
+
+	local function ensureLockOverlay()
+		if lockOverlay then return lockOverlay end
+
+		lockOverlay = Instance.new("TextButton")
+		lockOverlay.Name = "WindowLock"
+		lockOverlay.Size = UDim2.fromScale(1, 1)
+		lockOverlay.BackgroundColor3 = Color3.fromRGB(7, 8, 11)
+		lockOverlay.BackgroundTransparency = 0.14
+		lockOverlay.BorderSizePixel = 0
+		lockOverlay.AutoButtonColor = false
+		lockOverlay.Text = ""
+		lockOverlay.Active = true
+		lockOverlay.Modal = true
+		lockOverlay.Visible = false
+		lockOverlay.ZIndex = 900
+		lockOverlay.Parent = base
+
+		local card = Instance.new("Frame")
+		card.Name = "Card"
+		card.AnchorPoint = Vector2.new(0.5, 0.5)
+		card.Position = UDim2.fromScale(0.5, 0.5)
+		card.Size = UDim2.fromOffset(280, 132)
+		card.BackgroundColor3 = Color3.fromRGB(22, 23, 28)
+		card.BackgroundTransparency = 0.04
+		card.BorderSizePixel = 0
+		card.ZIndex = 901
+		card.Parent = lockOverlay
+
+		local cardCorner = Instance.new("UICorner")
+		cardCorner.CornerRadius = UDim.new(0, 10)
+		cardCorner.Parent = card
+
+		local cardStroke = Instance.new("UIStroke")
+		cardStroke.Color = Color3.fromRGB(255, 255, 255)
+		cardStroke.Transparency = 0.84
+		cardStroke.Thickness = 1
+		cardStroke.Parent = card
+
+		lockIcon = Instance.new("ImageLabel")
+		lockIcon.Name = "Icon"
+		lockIcon.AnchorPoint = Vector2.new(0.5, 0)
+		lockIcon.Position = UDim2.new(0.5, 0, 0, 18)
+		lockIcon.Size = UDim2.fromOffset(24, 24)
+		lockIcon.BackgroundTransparency = 1
+		lockIcon.ImageColor3 = Color3.fromRGB(238, 240, 245)
+		lockIcon.ZIndex = 902
+		lockIcon.Parent = card
+		MacLib:ApplyIcon(lockIcon, "lock-keyhole", lockIcon.ImageColor3)
+
+		lockTitle = Instance.new("TextLabel")
+		lockTitle.Name = "Title"
+		lockTitle.Position = UDim2.new(0, 16, 0, 50)
+		lockTitle.Size = UDim2.new(1, -32, 0, 24)
+		lockTitle.BackgroundTransparency = 1
+		lockTitle.Font = Enum.Font.GothamSemibold
+		lockTitle.Text = "Locked"
+		lockTitle.TextColor3 = Color3.fromRGB(245, 246, 249)
+		lockTitle.TextSize = 16
+		lockTitle.TextWrapped = true
+		lockTitle.ZIndex = 902
+		lockTitle.Parent = card
+
+		lockDescription = Instance.new("TextLabel")
+		lockDescription.Name = "Description"
+		lockDescription.Position = UDim2.new(0, 18, 0, 78)
+		lockDescription.Size = UDim2.new(1, -36, 0, 36)
+		lockDescription.BackgroundTransparency = 1
+		lockDescription.Font = Enum.Font.Gotham
+		lockDescription.Text = "This content is currently unavailable."
+		lockDescription.TextColor3 = Color3.fromRGB(170, 174, 184)
+		lockDescription.TextSize = 12
+		lockDescription.TextWrapped = true
+		lockDescription.ZIndex = 902
+		lockDescription.Parent = card
+
+		return lockOverlay
+	end
+
+	function WindowFunctions:Lock(options)
+		if type(options) ~= "table" then options = { Title = options } end
+		options = options or {}
+		local overlay = ensureLockOverlay()
+		lockTitle.Text = tostring(options.Title or options.Text or options.Name or "Locked")
+		lockDescription.Text = tostring(options.Description or options.Content or "This content is currently unavailable.")
+		MacLib:ApplyIcon(lockIcon, options.Icon or "lock-keyhole", options.IconColor or Color3.fromRGB(238, 240, 245))
+		overlay.Visible = true
+		return overlay
+	end
+
+	function WindowFunctions:Unlock()
+		if lockOverlay then lockOverlay.Visible = false end
+	end
+
+	function WindowFunctions:SetLocked(locked, options)
+		if locked then return self:Lock(options) end
+		return self:Unlock()
+	end
+
+	function WindowFunctions:IsLocked()
+		return lockOverlay ~= nil and lockOverlay.Visible == true
+	end
+
+	WindowFunctions.LockWindow = WindowFunctions.Lock
+	WindowFunctions.UnlockWindow = WindowFunctions.Unlock
+
 	macLib.Enabled = false
 	
 	local assetList = {}
