@@ -1470,11 +1470,13 @@ function MacLib:Window(Settings)
 	tooltip.Text = ""
 	tooltip.TextColor3 = Color3.fromRGB(235, 235, 235)
 	tooltip.TextSize = 12
-	tooltip.AutomaticSize = Enum.AutomaticSize.XY
+	tooltip.AutomaticSize = Enum.AutomaticSize.Y
 	tooltip.BackgroundColor3 = Color3.fromRGB(32, 32, 35)
 	tooltip.BorderSizePixel = 0
 	tooltip.AnchorPoint = Vector2.new(0.5, 1)
-	tooltip.Size = UDim2.fromOffset(0, 0)
+	tooltip.Size = UDim2.fromOffset(270, 0)
+	tooltip.TextWrapped = true
+	tooltip.TextXAlignment = Enum.TextXAlignment.Left
 	tooltip.Visible = false
 	tooltip.ZIndex = 250
 	tooltip.Parent = macLib
@@ -1503,12 +1505,15 @@ function MacLib:Window(Settings)
 			-- anchor above the control (flip below for controls hugging the screen top)
 			local ap = target.AbsolutePosition
 			local sz = target.AbsoluteSize
+			local camera = workspace.CurrentCamera
+			local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+			local x = math.clamp(ap.X + sz.X / 2, 145, math.max(145, viewport.X - 145))
 			if ap.Y < 40 then
 				tooltip.AnchorPoint = Vector2.new(0.5, 0)
-				tooltip.Position = UDim2.fromOffset(ap.X + sz.X / 2, ap.Y + sz.Y + 6)
+				tooltip.Position = UDim2.fromOffset(x, ap.Y + sz.Y + 6)
 			else
 				tooltip.AnchorPoint = Vector2.new(0.5, 1)
-				tooltip.Position = UDim2.fromOffset(ap.X + sz.X / 2, ap.Y - 6)
+				tooltip.Position = UDim2.fromOffset(x, ap.Y - 6)
 			end
 			tooltip.TextTransparency = 1
 			tooltip.BackgroundTransparency = 1
@@ -3247,6 +3252,7 @@ function MacLib:Window(Settings)
 					function SliderFunctions:GetValue()
 						return finalValue
 					end
+					attachTooltip(slider, Settings.Tooltip)
 					return SliderFunctions
 				end
 
@@ -3413,6 +3419,7 @@ function MacLib:Window(Settings)
 					function InputFunctions:UpdateText(Text)
 						inputBox.Text = Text
 					end
+					attachTooltip(input, Settings.Tooltip)
 					return InputFunctions
 				end
 
@@ -3548,6 +3555,7 @@ function MacLib:Window(Settings)
 					function KeybindFunctions:SetVisibility(State)
 						keybind.Visible = State
 					end
+					attachTooltip(keybind, Settings.Tooltip)
 					return KeybindFunctions
 				end
 
@@ -4112,6 +4120,7 @@ function MacLib:Window(Settings)
 						return OptionObjs[optionName] ~= nil
 					end
 
+					attachTooltip(dropdown, Settings.Tooltip)
 					return DropdownFunctions
 				end
 				
@@ -5424,6 +5433,7 @@ function MacLib:Window(Settings)
 						updateFromSettings()
 					end
 					
+					attachTooltip(colorpicker, Settings.Tooltip)
 					return ColorpickerFunctions
 				end
 				
@@ -6312,6 +6322,7 @@ function MacLib:Window(Settings)
 						paragraph.Visible = State
 					end
 
+					attachTooltip(paragraph, Settings.Tooltip)
 					return ParagraphFunctions
 				end
 				
@@ -7573,7 +7584,7 @@ function MacLib:Window(Settings)
 		footerFrame.AnchorPoint = Vector2.new(0.5, 1)
 		footerFrame.AutoButtonColor = false
 		footerFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-		footerFrame.BackgroundTransparency = 0.18
+		footerFrame.BackgroundTransparency = math.clamp(tonumber(Settings.FooterTransparency) or 0.18, 0, 1)
 		footerFrame.BorderSizePixel = 0
 		footerFrame.Position = UDim2.fromScale(0.5, 1)
 		footerFrame.Size = UDim2.new(1, 0, 0, 23)
@@ -7585,7 +7596,7 @@ function MacLib:Window(Settings)
 		footerCorner.Parent = footerFrame
 		local footerStroke = Instance.new("UIStroke")
 		footerStroke.Color = Color3.fromRGB(255, 255, 255)
-		footerStroke.Transparency = 0.92
+		footerStroke.Transparency = math.clamp(tonumber(Settings.FooterStrokeTransparency) or 0.92, 0, 1)
 		footerStroke.Parent = footerFrame
 		footerText = Instance.new("TextLabel")
 		footerText.BackgroundTransparency = 1
@@ -7594,7 +7605,7 @@ function MacLib:Window(Settings)
 		footerText.Size = UDim2.new(1, -20, 1, 0)
 		footerText.TextColor3 = Color3.fromRGB(220, 222, 228)
 		footerText.TextSize = 10
-		footerText.TextTransparency = 0.35
+		footerText.TextTransparency = math.clamp(tonumber(Settings.FooterTextTransparency) or 0.35, 0, 1)
 		footerText.TextTruncate = Enum.TextTruncate.AtEnd
 		footerText.TextXAlignment = Enum.TextXAlignment.Center
 		footerText.ZIndex = 91
@@ -8453,6 +8464,7 @@ do
 				Maximum = tonumber(max) or 100,
 				Default = tonumber(default) or tonumber(min) or 0,
 				DisplayMethod = opts.DisplayMethod or "Value",
+				Tooltip = opts.Tooltip,
 				Callback = callbackProxy(userCallback, function() return control end),
 			}), "Slider")
 			control.Value = control.GetValue and control:GetValue() or tonumber(default) or tonumber(min) or 0
@@ -8475,6 +8487,7 @@ do
 				Default = tostring(first(opts.Default, opts.Value, opts.Text, "")),
 				Placeholder = tostring(first(opts.Placeholder, opts.PlaceholderText, "")),
 				AcceptedCharacters = opts.AcceptedCharacters,
+				Tooltip = opts.Tooltip,
 				Callback = callbackProxy(callback, function() return control end),
 				onChanged = callbackProxy(callback, function() return control end),
 			}), "Input")
@@ -8504,6 +8517,7 @@ do
 				Search = true,
 				Required = opts.Required ~= false,
 				Default = normalizeDefault(first(opts.Default, opts.Value, opts.CurrentOption), options, multi),
+				Tooltip = opts.Tooltip,
 				Callback = callbackProxy(userCallback, function() return control end),
 			}), "Dropdown")
 			control.Options = options
@@ -8553,6 +8567,7 @@ do
 				Name = toName(opts, "Colorpicker"),
 				Default = defaultColor,
 				Alpha = first(opts.Alpha, opts.Transparency),
+				Tooltip = opts.Tooltip,
 				Callback = function(color, alpha)
 					if control then
 						control.Value = color
@@ -8586,6 +8601,7 @@ do
 			return finalizeControl(id, patchControl(nativeParagraph(self, {
 				Header = toName(opts, "Paragraph"),
 				Body = toDescription(opts),
+				Tooltip = opts.Tooltip,
 			}), "Paragraph"), opts)
 		end
 		section.AddParagraph = section.AddParagraph or function(self, title, opts)
@@ -8811,6 +8827,9 @@ do
 			BackgroundImageTransparency = settings.BackgroundImageTransparency,
 			BackgroundImageScaleType = settings.BackgroundImageScaleType,
 			Footer = settings.Footer,
+			FooterTransparency = settings.FooterTransparency,
+			FooterStrokeTransparency = settings.FooterStrokeTransparency,
+			FooterTextTransparency = settings.FooterTextTransparency,
 		})
 		self.__LastWindow = patchWindow(window)
 		self.Window = self.__LastWindow
