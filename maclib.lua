@@ -1471,14 +1471,14 @@ function MacLib:Window(Settings)
 	tooltip.TextColor3 = Color3.fromRGB(235, 235, 235)
 	tooltip.TextSize = 12
 	tooltip.AutomaticSize = Enum.AutomaticSize.Y
-	tooltip.BackgroundColor3 = Color3.fromRGB(32, 32, 35)
+	tooltip.BackgroundColor3 = Color3.fromRGB(20, 21, 25)
 	tooltip.BorderSizePixel = 0
 	tooltip.AnchorPoint = Vector2.new(0.5, 1)
 	tooltip.Size = UDim2.fromOffset(270, 0)
 	tooltip.TextWrapped = true
 	tooltip.TextXAlignment = Enum.TextXAlignment.Left
 	tooltip.Visible = false
-	tooltip.ZIndex = 250
+	tooltip.ZIndex = 10000
 	tooltip.Parent = macLib
 
 	local tooltipCorner = Instance.new("UICorner")
@@ -1486,9 +1486,13 @@ function MacLib:Window(Settings)
 	tooltipCorner.Parent = tooltip
 
 	local tooltipStroke = Instance.new("UIStroke")
-	tooltipStroke.Color = Color3.fromRGB(255, 255, 255)
-	tooltipStroke.Transparency = 0.85
+	tooltipStroke.Color = Color3.fromRGB(210, 216, 228)
+	tooltipStroke.Transparency = 0.82
 	tooltipStroke.Parent = tooltip
+
+	local tooltipScale = Instance.new("UIScale")
+	tooltipScale.Scale = 1
+	tooltipScale.Parent = tooltip
 
 	local tooltipPad = Instance.new("UIPadding")
 	tooltipPad.PaddingTop = UDim.new(0, 5)
@@ -1497,36 +1501,55 @@ function MacLib:Window(Settings)
 	tooltipPad.PaddingRight = UDim.new(0, 9)
 	tooltipPad.Parent = tooltip
 
+	local tooltipTarget
+	local tooltipPositionConnection
+	local function placeTooltip(inputPosition)
+		if not tooltipTarget or not tooltipTarget.Parent then return end
+		local camera = workspace.CurrentCamera
+		local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+		local point = inputPosition or UserInputService:GetMouseLocation()
+		local width = 270
+		local x = math.clamp(point.X + 14, 8, math.max(8, viewport.X - width - 8))
+		local estimatedHeight = math.max(34, tooltip.AbsoluteSize.Y)
+		local y = point.Y + 18
+		if y + estimatedHeight > viewport.Y - 8 then y = point.Y - estimatedHeight - 12 end
+		tooltip.AnchorPoint = Vector2.zero
+		tooltip.Position = UDim2.fromOffset(x, math.max(8, y))
+	end
+
+	local function hideTooltip(target)
+		if target and tooltipTarget ~= target then return end
+		tooltipTarget = nil
+		tooltip.Visible = false
+	end
+
 	local function attachTooltip(target, text)
 		if type(text) ~= "string" or text == "" then return end
 		target.MouseEnter:Connect(function()
+			tooltipTarget = target
 			tooltip.Text = text
 			tooltip.Visible = true
-			-- anchor above the control (flip below for controls hugging the screen top)
-			local ap = target.AbsolutePosition
-			local sz = target.AbsoluteSize
-			local camera = workspace.CurrentCamera
-			local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
-			local x = math.clamp(ap.X + sz.X / 2, 145, math.max(145, viewport.X - 145))
-			if ap.Y < 40 then
-				tooltip.AnchorPoint = Vector2.new(0.5, 0)
-				tooltip.Position = UDim2.fromOffset(x, ap.Y + sz.Y + 6)
-			else
-				tooltip.AnchorPoint = Vector2.new(0.5, 1)
-				tooltip.Position = UDim2.fromOffset(x, ap.Y - 6)
-			end
+			placeTooltip()
+			tooltipScale.Scale = 0.94
 			tooltip.TextTransparency = 1
 			tooltip.BackgroundTransparency = 1
 			tooltipStroke.Transparency = 1
-			Tween(tooltip, TweenInfo.new(0.12, Enum.EasingStyle.Sine), {
-				TextTransparency = 0, BackgroundTransparency = 0.05
+			Tween(tooltip, TweenInfo.new(0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+				TextTransparency = 0, BackgroundTransparency = 0.14
 			}):Play()
-			Tween(tooltipStroke, TweenInfo.new(0.12, Enum.EasingStyle.Sine), { Transparency = 0.85 }):Play()
+			Tween(tooltipStroke, TweenInfo.new(0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Transparency = 0.82 }):Play()
+			Tween(tooltipScale, TweenInfo.new(0.14, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 		end)
 		target.MouseLeave:Connect(function()
-			tooltip.Visible = false
+			hideTooltip(target)
 		end)
 	end
+
+	tooltipPositionConnection = UserInputService.InputChanged:Connect(function(input)
+		if tooltipTarget and input.UserInputType == Enum.UserInputType.MouseMovement then
+			placeTooltip(input.Position)
+		end
+	end)
 
 	function WindowFunctions:UpdateTitle(NewTitle)
 		title.Text = NewTitle
@@ -7560,8 +7583,8 @@ function MacLib:Window(Settings)
 	end
 
 	local footerFrame
-	local footerText
-	local footerCopyValue
+	local footerContent
+	local footerValue
 	local function flattenSegments(Value)
 		if type(Value) ~= "table" then return tostring(Value or ""), nil end
 		local parts = {}
@@ -7577,18 +7600,101 @@ function MacLib:Window(Settings)
 		return table.concat(parts, " "), copyValue
 	end
 
+	local function clipboardFunction()
+		return setclipboard or toclipboard or writeclipboard
+	end
+
+	local function clearFooterContent()
+		if not footerContent then return end
+		for _, child in ipairs(footerContent:GetChildren()) do
+			if not child:IsA("UIListLayout") then child:Destroy() end
+		end
+	end
+
+	local function makeFooterSegment(segment)
+		local isTable = type(segment) == "table"
+		local text = isTable and tostring(segment.Text or segment.Title or segment.Value or "") or tostring(segment or "")
+		local copyable = isTable and segment.Copyable == true
+		local copyValue = isTable and tostring(segment.CopyText or text) or nil
+		local holder = Instance.new(copyable and "TextButton" or "Frame")
+		holder.Name = copyable and "CopyableSegment" or "Segment"
+		holder.AutomaticSize = Enum.AutomaticSize.X
+		holder.Size = UDim2.fromOffset(0, 18)
+		holder.BackgroundTransparency = 1
+		holder.BorderSizePixel = 0
+		holder.ZIndex = 91
+		if copyable then
+			holder.AutoButtonColor = false
+			holder.Text = ""
+		end
+		holder.Parent = footerContent
+
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.VerticalAlignment = Enum.VerticalAlignment.Center
+		layout.Padding = UDim.new(0, copyable and 4 or 0)
+		layout.Parent = holder
+
+		local label = Instance.new("TextLabel")
+		label.Name = "Text"
+		label.AutomaticSize = Enum.AutomaticSize.X
+		label.Size = UDim2.fromOffset(0, 18)
+		label.BackgroundTransparency = 1
+		label.FontFace = Font.new(assets.interFont, copyable and Enum.FontWeight.Medium or Enum.FontWeight.Regular)
+		label.Text = text
+		label.TextColor3 = copyable and Color3.fromRGB(88, 166, 255) or Color3.fromRGB(205, 208, 216)
+		label.TextSize = 10
+		label.TextTransparency = copyable and 0.02 or math.clamp(tonumber(Settings.FooterTextTransparency) or 0.22, 0, 1)
+		label.ZIndex = 92
+		label.Parent = holder
+
+		local copyIcon
+		if copyable then
+			copyIcon = Instance.new("ImageLabel")
+			copyIcon.Name = "CopyIcon"
+			copyIcon.Size = UDim2.fromOffset(11, 11)
+			copyIcon.BackgroundTransparency = 1
+			copyIcon.ZIndex = 92
+			copyIcon.Parent = holder
+			MacLib:ApplyIcon(copyIcon, "copy", Color3.fromRGB(88, 166, 255))
+			holder.MouseEnter:Connect(function()
+				label.TextColor3 = Color3.fromRGB(130, 190, 255)
+				copyIcon.ImageColor3 = Color3.fromRGB(130, 190, 255)
+			end)
+			holder.MouseLeave:Connect(function()
+				label.TextColor3 = Color3.fromRGB(88, 166, 255)
+				copyIcon.ImageColor3 = Color3.fromRGB(88, 166, 255)
+			end)
+			holder.MouseButton1Click:Connect(function()
+				local clipboard = clipboardFunction()
+				local ok = clipboard and pcall(clipboard, copyValue)
+				if ok then
+					label.Text = "Copied"
+					MacLib:ApplyIcon(copyIcon, "check", Color3.fromRGB(98, 218, 150))
+					task.delay(1.1, function()
+						if label.Parent then
+							label.Text = text
+							MacLib:ApplyIcon(copyIcon, "copy", Color3.fromRGB(88, 166, 255))
+						end
+					end)
+				end
+			end)
+			attachTooltip(holder, "Click to copy")
+		end
+		return holder
+	end
+
 	local function ensureFooter()
 		if footerFrame then return footerFrame end
-		footerFrame = Instance.new("TextButton")
+		footerFrame = Instance.new("Frame")
 		footerFrame.Name = "Footer"
 		footerFrame.AnchorPoint = Vector2.new(0.5, 1)
-		footerFrame.AutoButtonColor = false
 		footerFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-		footerFrame.BackgroundTransparency = math.clamp(tonumber(Settings.FooterTransparency) or 0.18, 0, 1)
+		footerFrame.BackgroundTransparency = math.clamp(tonumber(Settings.FooterTransparency) or 0.62, 0, 1)
 		footerFrame.BorderSizePixel = 0
 		footerFrame.Position = UDim2.fromScale(0.5, 1)
 		footerFrame.Size = UDim2.new(1, 0, 0, 23)
-		footerFrame.Text = ""
 		footerFrame.ZIndex = 90
 		footerFrame.Parent = base
 		local footerCorner = Instance.new("UICorner")
@@ -7598,31 +7704,38 @@ function MacLib:Window(Settings)
 		footerStroke.Color = Color3.fromRGB(255, 255, 255)
 		footerStroke.Transparency = math.clamp(tonumber(Settings.FooterStrokeTransparency) or 0.92, 0, 1)
 		footerStroke.Parent = footerFrame
-		footerText = Instance.new("TextLabel")
-		footerText.BackgroundTransparency = 1
-		footerText.FontFace = Font.new(assets.interFont)
-		footerText.Position = UDim2.fromOffset(10, 0)
-		footerText.Size = UDim2.new(1, -20, 1, 0)
-		footerText.TextColor3 = Color3.fromRGB(220, 222, 228)
-		footerText.TextSize = 10
-		footerText.TextTransparency = math.clamp(tonumber(Settings.FooterTextTransparency) or 0.35, 0, 1)
-		footerText.TextTruncate = Enum.TextTruncate.AtEnd
-		footerText.TextXAlignment = Enum.TextXAlignment.Center
-		footerText.ZIndex = 91
-		footerText.Parent = footerFrame
-		footerFrame.MouseButton1Click:Connect(function()
-			local clipboard = setclipboard or toclipboard
-			if clipboard and footerCopyValue then pcall(clipboard, footerCopyValue) end
-		end)
+		footerContent = Instance.new("Frame")
+		footerContent.Name = "Content"
+		footerContent.AnchorPoint = Vector2.new(0.5, 0.5)
+		footerContent.Position = UDim2.fromScale(0.5, 0.5)
+		footerContent.Size = UDim2.new(1, -24, 1, 0)
+		footerContent.BackgroundTransparency = 1
+		footerContent.ClipsDescendants = true
+		footerContent.ZIndex = 91
+		footerContent.Parent = footerFrame
+		local footerLayout = Instance.new("UIListLayout")
+		footerLayout.FillDirection = Enum.FillDirection.Horizontal
+		footerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		footerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		footerLayout.Padding = UDim.new(0, 6)
+		footerLayout.Parent = footerContent
 		return footerFrame
 	end
 
 	function WindowFunctions:SetFooter(Value)
-		local text, copyValue = flattenSegments(Value)
 		ensureFooter()
-		footerText.Text = text
-		footerCopyValue = copyValue
-		footerFrame.Visible = text ~= ""
+		footerValue = Value
+		clearFooterContent()
+		local values = type(Value) == "table" and Value or { Value }
+		local hasText = false
+		for _, segment in ipairs(values) do
+			local segmentText = type(segment) == "table" and (segment.Text or segment.Title or segment.Value) or segment
+			if tostring(segmentText or "") ~= "" then
+				hasText = true
+				makeFooterSegment(segment)
+			end
+		end
+		footerFrame.Visible = hasText
 		return footerFrame
 	end
 
