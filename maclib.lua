@@ -115,6 +115,7 @@ function MacLib:Window(Settings)
 	WindowFunctions.Settings = Settings
 	local searchRegistry = {}
 	local windowTabs = {}
+	local tabSwitcherButtons = {}
 	local autoSelectTabs = Settings.AutoSelect ~= false
 	local animationsEnabled = Settings.Animations ~= false
 	local confirmCloseEnabled = Settings.ConfirmClose ~= false
@@ -2075,6 +2076,7 @@ function MacLib:Window(Settings)
 			tabSwitcherUIPadding.Parent = tabSwitcher
 
 			tabSwitcher.Parent = sectionTabSwitchers
+			table.insert(tabSwitcherButtons, tabSwitcher)
 
 			local elements1 = Instance.new("Frame")
 			elements1.Name = "Elements"
@@ -5805,9 +5807,20 @@ function MacLib:Window(Settings)
 					icon.BackgroundTransparency = 1
 					icon.Position = UDim2.fromScale(0.5, 0.5)
 					icon.Size = isAssetDiscordIcon and UDim2.fromScale(1, 1) or UDim2.fromOffset(19, 19)
-					icon.ScaleType = isAssetDiscordIcon and Enum.ScaleType.Crop or Enum.ScaleType.Fit
+					icon.ScaleType = Enum.ScaleType.Fit
 					icon.Parent = iconBack
-					MacLib:ApplyIcon(icon, rawDiscordIcon, Settings.IconColor or (isAssetDiscordIcon and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(225, 227, 232)))
+					if isAssetDiscordIcon then
+						local asset = type(rawDiscordIcon) == "number" and ("rbxassetid://" .. tostring(rawDiscordIcon)) or tostring(rawDiscordIcon)
+						if asset:match("^%d+$") then asset = "rbxassetid://" .. asset end
+						icon.Image = asset
+						icon.ImageRectOffset = Vector2.zero
+						icon.ImageRectSize = Vector2.zero
+						icon.ImageColor3 = Settings.IconColor or Color3.fromRGB(255, 255, 255)
+						icon.ImageTransparency = 0
+						icon.Visible = true
+					else
+						MacLib:ApplyIcon(icon, rawDiscordIcon, Settings.IconColor or Color3.fromRGB(225, 227, 232))
+					end
 
 					local title = Instance.new("TextLabel")
 					title.BackgroundTransparency = 1
@@ -6346,8 +6359,11 @@ function MacLib:Window(Settings)
 					currentTabInstance.Parent = nil
 				end
 
-				for _, v in pairs(tabSwitchersScrollingFrame:GetDescendants()) do
-					if v.Name == "TabSwitcher" then
+				-- Keep a Lua registry instead of calling GetDescendants here. Some
+				-- executors run deferred callbacks without the Plugin capability and
+				-- reject that Instance traversal even though the UI already exists.
+				for _, v in ipairs(tabSwitcherButtons) do
+					if v and v.Parent then
 						Tween(v, TweenInfo.new(easetime, Enum.EasingStyle.Sine), {
 							BackgroundTransparency = 1
 						}):Play()
