@@ -8735,6 +8735,38 @@ do
 		section.AddProgressBar = section.AddProgressBar or function(self, opts) return self:ProgressBar(opts or {}) end
 		section.AddStatus = section.AddStatus or function(self, opts) return self:Status(opts or {}) end
 		section.AddButtonRow = section.AddButtonRow or function(self, opts) return self:ButtonRow(opts or {}) end
+		section.AddSegmented = section.AddSegmented or function(self, idOrOpts, maybeOpts)
+			local _, opts = mergeIdOptions(idOrOpts, maybeOpts)
+			opts = opts or {}
+			local values = opts.Values or opts.Options or {}
+			local controller
+			local buttons = {}
+			for _, value in ipairs(values) do
+				buttons[#buttons + 1] = {
+					Title = tostring(value),
+					Callback = function() if controller then controller:SetValue(value, true) end end,
+				}
+			end
+			controller = self:ButtonRow({ Buttons = buttons })
+			controller.Value = opts.Default or values[1]
+			function controller:SetValue(value, fireCallback)
+				if not table.find(values, value) then return end
+				self.Value = value
+				for index, button in ipairs(self.Buttons or {}) do
+					local selected = values[index] == value
+					button.BackgroundTransparency = selected and 0.72 or 0.94
+					local stroke = button:FindFirstChildOfClass("UIStroke")
+					if stroke then stroke.Transparency = selected and 0.46 or 0.88 end
+					local label = button:FindFirstChildWhichIsA("TextLabel")
+					if label then label.TextTransparency = selected and 0 or 0.32 end
+				end
+				if fireCallback ~= false and opts.Callback then task.spawn(opts.Callback, value) end
+			end
+			function controller:GetValue() return self.Value end
+			controller:SetValue(controller.Value, false)
+			return controller
+		end
+		section.Segmented = section.Segmented or section.AddSegmented
 		section.AddCode = section.AddCode or function(self, opts) return self:Code(opts or {}) end
 		section.AddDivider = section.AddDivider or function(self) return self:Divider() end
 		section.AddSpacer = section.AddSpacer or function(self) return self:Spacer() end
@@ -8786,7 +8818,7 @@ do
 		for _, method in ipairs({
 			"Button", "Toggle", "Slider", "Input", "Dropdown", "Colorpicker", "Paragraph",
 			"AddButton", "AddToggle", "AddSlider", "AddInput", "AddDropdown", "AddColorpicker", "AddColorPicker", "AddParagraph",
-			"AddDivider", "AddSpacer"
+			"AddSegmented", "Segmented", "AddDivider", "AddSpacer"
 		}) do
 			if tab[method] == nil then
 				tab[method] = function(self, ...)
