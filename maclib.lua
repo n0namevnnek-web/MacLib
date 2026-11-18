@@ -1677,13 +1677,16 @@ function MacLib:Window(Settings)
 		windowControls.Visible = false
 		globalSettings.AnchorPoint = Vector2.new(0, 1)
 		globalSettings.Position = UDim2.new(0, 12, 1, -74)
+		globalSettings.BackgroundColor3 = Color3.fromRGB(15, 13, 15)
+		globalSettings.BackgroundTransparency = .08
+		content.AnchorPoint = Vector2.new(0, 0)
 		content.Position = UDim2.fromOffset(0, 52)
 		content.Size = UDim2.new(1, 0, 1, -94)
 
 		local header = Instance.new("Frame")
 		header.Name = "HorizontalHeader"
 		header.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-		header.BackgroundTransparency = .20
+		header.BackgroundTransparency = .08
 		header.BorderSizePixel = 0
 		header.Size = UDim2.new(1, 0, 0, 52)
 		header.ZIndex = 180
@@ -1761,7 +1764,7 @@ function MacLib:Window(Settings)
 		searchBar.Parent=actions; searchBar.AnchorPoint=Vector2.zero; searchBar.Position=UDim2.new(); searchBar.Size=UDim2.fromOffset(176,32); searchBar.LayoutOrder=-10; searchBar.ZIndex=183
 		searchBarIcon.ZIndex=184; searchInput.ZIndex=184; searchClear.ZIndex=184
 
-		local dock=Instance.new("Frame"); dock.Name="HorizontalDock"; dock.AnchorPoint=Vector2.new(.5,1); dock.Position=UDim2.new(.5,0,1,-24); dock.Size=UDim2.new(1,-18,0,45); dock.BackgroundColor3=Color3.fromRGB(10,10,12); dock.BackgroundTransparency=.22; dock.BorderSizePixel=0; dock.ZIndex=180; dock.Parent=base
+		local dock=Instance.new("Frame"); dock.Name="HorizontalDock"; dock.AnchorPoint=Vector2.new(.5,1); dock.Position=UDim2.new(.5,0,1,-24); dock.Size=UDim2.new(1,-18,0,45); dock.BackgroundColor3=Color3.fromRGB(10,10,12); dock.BackgroundTransparency=.08; dock.BorderSizePixel=0; dock.ZIndex=180; dock.Parent=base
 		local dockCorner=Instance.new("UICorner"); dockCorner.CornerRadius=UDim.new(0,9); dockCorner.Parent=dock
 		local dockStroke=Instance.new("UIStroke"); dockStroke.Color=Color3.fromRGB(255,255,255); dockStroke.Transparency=.91; dockStroke.Parent=dock
 		local playerCard=Instance.new("TextButton"); playerCard.Name="PlayerCard"; playerCard.AutoButtonColor=false; playerCard.BackgroundColor3=Color3.fromRGB(255,255,255); playerCard.BackgroundTransparency=.94; playerCard.BorderSizePixel=0; playerCard.Position=UDim2.fromOffset(6,5); playerCard.Size=UDim2.fromOffset(168,35); playerCard.Text=""; playerCard.ZIndex=182; playerCard.Parent=dock
@@ -1770,6 +1773,23 @@ function MacLib:Window(Settings)
 		local playerName=Instance.new("TextLabel"); playerName.BackgroundTransparency=1; playerName.Position=UDim2.fromOffset(39,3); playerName.Size=UDim2.new(1,-45,0,16); playerName.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); playerName.Text=Settings.Anonymous and (Settings.AnonymousName or "Anonymous") or LocalPlayer.DisplayName; playerName.TextColor3=Color3.fromRGB(244,244,246); playerName.TextSize=11; playerName.TextTruncate=Enum.TextTruncate.AtEnd; playerName.TextXAlignment=Enum.TextXAlignment.Left; playerName.ZIndex=183; playerName.Parent=playerCard
 		local playerTier=Instance.new("TextLabel"); playerTier.BackgroundTransparency=1; playerTier.Position=UDim2.fromOffset(39,18); playerTier.Size=UDim2.new(1,-45,0,13); playerTier.FontFace=Font.new(assets.interFont); playerTier.Text=tostring(Settings.UserTier or Settings.Tier or "Free Users"); playerTier.TextColor3=Color3.fromRGB(255,255,255); playerTier.TextTransparency=.58; playerTier.TextSize=9; playerTier.TextXAlignment=Enum.TextXAlignment.Left; playerTier.ZIndex=183; playerTier.Parent=playerCard
 		playerCard.MouseButton1Click:Connect(function() playUISound("Open",1.05,.15,.03); toggle() end)
+
+		local settingsScale=100
+		local function playerSettingRow(iconValue,labelText,valueText,callback,order)
+			local row=Instance.new("TextButton"); row.Name="PlayerSetting"; row.AutoButtonColor=false; row.BackgroundColor3=Color3.fromRGB(255,255,255); row.BackgroundTransparency=.95; row.BorderSizePixel=0; row.LayoutOrder=order or -20; row.Size=UDim2.fromOffset(220,34); row.Text=""; row.Parent=globalSettings
+			local rc=Instance.new("UICorner"); rc.CornerRadius=UDim.new(0,7); rc.Parent=row
+			local ri=Instance.new("ImageLabel"); ri.BackgroundTransparency=1; ri.Position=UDim2.fromOffset(9,9); ri.Size=UDim2.fromOffset(15,15); ri.Parent=row; MacLib:ApplyIcon(ri,iconValue,Color3.fromRGB(210,212,218))
+			local rn=Instance.new("TextLabel"); rn.BackgroundTransparency=1; rn.Position=UDim2.fromOffset(32,0); rn.Size=UDim2.new(1,-94,1,0); rn.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); rn.Text=tostring(labelText); rn.TextColor3=Color3.fromRGB(230,232,236); rn.TextSize=11; rn.TextXAlignment=Enum.TextXAlignment.Left; rn.Parent=row
+			local rv=Instance.new("TextLabel"); rv.AnchorPoint=Vector2.new(1,0); rv.BackgroundTransparency=1; rv.Position=UDim2.new(1,-10,0,0); rv.Size=UDim2.fromOffset(75,34); rv.FontFace=Font.new(assets.interFont); rv.Text=tostring(valueText or ""); rv.TextColor3=accentColor; rv.TextSize=10; rv.TextXAlignment=Enum.TextXAlignment.Right; rv.Parent=row
+			row.MouseEnter:Connect(function() playUISound("Hover",1.1,.06,.08); Tween(row,TweenInfo.new(.12),{BackgroundTransparency=.89}):Play() end); row.MouseLeave:Connect(function() Tween(row,TweenInfo.new(.12),{BackgroundTransparency=.95}):Play() end)
+			row.MouseButton1Click:Connect(function() playUISound("Select",1.04,.12,.03); if callback then callback(rv) end end)
+			return row
+		end
+		playerSettingRow("palette","Theme","Midnight",function() themePopup.Visible=not themePopup.Visible end,-60)
+		playerSettingRow("scan-line","Menu Scale","100%",function(value) settingsScale=settingsScale==100 and 110 or (settingsScale==110 and 90 or 100); baseUIScale.Scale=settingsScale/100; value.Text=settingsScale.."%" end,-59)
+		playerSettingRow("languages","Language",Settings.Language or "EN",function(value) value.Text=value.Text=="EN" and "VI" or "EN" end,-58)
+		playerSettingRow("keyboard","Menu Key",tostring((Settings.Keybind or Enum.KeyCode.RightControl).Name):gsub("RightControl","Right Ctrl"),nil,-57)
+		playerSettingRow("panels-top-left","View","Full",function(value) local nextDock=not WindowFunctions:GetDockMode(); WindowFunctions:SetDockMode(nextDock); value.Text=nextDock and "Dock" or "Full" end,-56)
 
 		local activeCount=Instance.new("TextLabel"); activeCount.AnchorPoint=Vector2.new(0,1); activeCount.BackgroundTransparency=1; activeCount.Position=UDim2.new(0,10,0,0); activeCount.Size=UDim2.fromOffset(150,18); activeCount.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); activeCount.Text="◉  "..tostring(Settings.ActiveUsers or "active"); activeCount.TextColor3=accentColor; activeCount.TextSize=9; activeCount.TextXAlignment=Enum.TextXAlignment.Left; activeCount.ZIndex=183; activeCount.Parent=dock
 
@@ -1785,6 +1805,24 @@ function MacLib:Window(Settings)
 			b.MouseButton1Click:Connect(function() tabFunctions:Select(); playUISound("Select",1.04,.14,.03) end)
 			tabFunctions.DockButton=b
 		end
+
+		local function updateHorizontalHeader()
+			local width=base.AbsoluteSize.X
+			local compact=width<720
+			brand.Size=UDim2.fromOffset(compact and 138 or 205,26)
+			brand.TextSize=compact and 15 or 20
+			brandSub.Size=UDim2.fromOffset(compact and 138 or 205,15)
+			brandSub.TextSize=compact and 8 or 9
+			actions.Size=UDim2.fromOffset(compact and 196 or 520,36)
+			gameButton.Visible=not compact
+			languageButton.Visible=not compact
+			searchBar.Visible=not compact
+			playerCard.Size=UDim2.fromOffset(compact and 130 or 168,35)
+			dockScroll.Position=UDim2.fromOffset(compact and 138 or 182,4)
+			dockScroll.Size=UDim2.new(1,-(compact and 144 or 188),1,-8)
+		end
+		base:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateHorizontalHeader)
+		task.defer(updateHorizontalHeader)
 
 		-- Collapsible navigation group for related pages (for example Sea Events).
 		function WindowFunctions:NavigationGroup(options)
