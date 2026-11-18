@@ -151,6 +151,9 @@ function MacLib:Window(Settings)
 	local autoSelectTabs = Settings.AutoSelect ~= false
 	local animationsEnabled = Settings.Animations ~= false
 	local confirmCloseEnabled = Settings.ConfirmClose ~= false
+	local cleanupCallbacks = {}
+	local activityRegistry = {}
+	local windowStartedAt = os.clock()
 	if type(Settings.Sounds) == "table" then MacLib:SetUISounds(Settings.Sounds) end
 	currentTabInstance = nil
 	tabIndex = 0
@@ -172,6 +175,32 @@ function MacLib:Window(Settings)
 	end
 	function WindowFunctions:GetAccent()
 		return accentColor
+	end
+
+	function WindowFunctions:RegisterCleanup(callback)
+		if type(callback) == "function" then table.insert(cleanupCallbacks, callback) end
+		return callback
+	end
+
+	function WindowFunctions:SetActivity(name, enabled, detail)
+		name = tostring(name or "Activity")
+		if enabled == false then
+			activityRegistry[name] = nil
+		else
+			local current = activityRegistry[name]
+			activityRegistry[name] = {
+				Name = name,
+				Detail = tostring(detail or (current and current.Detail) or "Running"),
+				StartedAt = current and current.StartedAt or os.clock(),
+			}
+		end
+	end
+
+	function WindowFunctions:GetActivities()
+		local result = {}
+		for _, activity in pairs(activityRegistry) do table.insert(result, activity) end
+		table.sort(result, function(a, b) return a.StartedAt < b.StartedAt end)
+		return result
 	end
 
 	-- builds a centered, breathing, accent-colored line inside a 2px-tall container
@@ -5697,6 +5726,124 @@ function MacLib:Window(Settings)
 					return StatusFunctions
 				end
 
+				-- Wide session card with live telemetry. The caller may replace any value
+				-- with SetMetric without rebuilding the card.
+				function SectionFunctions:Overview(Settings)
+					Settings = Settings or {}
+					local API = {}
+					local card, stroke = createModernCard("Overview", 176)
+					stroke.Transparency = 0.86
+					local avatar = Instance.new("ImageLabel")
+					avatar.BackgroundColor3 = accentColor; avatar.BackgroundTransparency = 0.82
+					avatar.Position = UDim2.fromOffset(15, 15); avatar.Size = UDim2.fromOffset(48, 48)
+					avatar.Image = tostring(Settings.Image or headshotImage or "rbxassetid://0"); avatar.Parent = card
+					local avatarCorner = Instance.new("UICorner"); avatarCorner.CornerRadius = UDim.new(1, 0); avatarCorner.Parent = avatar
+					local avatarStroke = Instance.new("UIStroke"); avatarStroke.Color = accentColor; avatarStroke.Transparency = .25; avatarStroke.Thickness = 2; avatarStroke.Parent = avatar
+
+					local heading = Instance.new("TextLabel")
+					heading.BackgroundTransparency=1; heading.Position=UDim2.fromOffset(76,16); heading.Size=UDim2.new(1,-180,0,24)
+					heading.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); heading.TextSize=15; heading.TextColor3=Color3.fromRGB(248,248,248)
+					heading.TextXAlignment=Enum.TextXAlignment.Left; heading.Text=tostring(Settings.Title or ("Hello, "..LocalPlayer.DisplayName)); heading.Parent=card
+					local sub = Instance.new("TextLabel")
+					sub.BackgroundTransparency=1; sub.Position=UDim2.fromOffset(76,39); sub.Size=UDim2.new(1,-180,0,18)
+					sub.FontFace=Font.new(assets.interFont); sub.TextSize=10; sub.TextColor3=Color3.fromRGB(255,255,255); sub.TextTransparency=.5
+					sub.TextXAlignment=Enum.TextXAlignment.Left; sub.Text=tostring(Settings.Subtitle or "Live session information"); sub.Parent=card
+					local badge=Instance.new("TextLabel"); badge.AnchorPoint=Vector2.new(1,0); badge.AutomaticSize=Enum.AutomaticSize.X
+					badge.Position=UDim2.new(1,-15,0,22); badge.Size=UDim2.fromOffset(0,22); badge.BackgroundColor3=Color3.fromRGB(43,196,112); badge.BackgroundTransparency=.78
+					badge.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); badge.TextSize=9; badge.TextColor3=Color3.fromRGB(75,229,143); badge.Text=tostring(Settings.Status or "ACTIVE"); badge.Parent=card
+					local badgePadding=Instance.new("UIPadding"); badgePadding.PaddingLeft=UDim.new(0,9); badgePadding.PaddingRight=UDim.new(0,9); badgePadding.Parent=badge
+					local badgeCorner=Instance.new("UICorner"); badgeCorner.CornerRadius=UDim.new(1,0); badgeCorner.Parent=badge
+
+					local metricHolder=Instance.new("Frame"); metricHolder.BackgroundColor3=Color3.fromRGB(5,6,9); metricHolder.BackgroundTransparency=.42
+					metricHolder.Position=UDim2.fromOffset(14,76); metricHolder.Size=UDim2.new(1,-28,0,84); metricHolder.Parent=card
+					local metricCorner=Instance.new("UICorner"); metricCorner.CornerRadius=UDim.new(0,10); metricCorner.Parent=metricHolder
+					local metricGrid=Instance.new("UIGridLayout"); metricGrid.CellPadding=UDim2.fromOffset(4,4); metricGrid.CellSize=UDim2.new(.25,-3,.5,-2); metricGrid.SortOrder=Enum.SortOrder.LayoutOrder; metricGrid.Parent=metricHolder
+					local labels={}
+					local defaults={{"FPS","--","gauge"},{"Ping","--","wifi"},{"Executor","Unknown","cpu"},{"Place",game.Name,"map-pin"},{"Country","--","globe"},{"Time",os.date("%H:%M"),"clock"},{"Players",#Players:GetPlayers().." / "..Players.MaxPlayers,"users"},{"Runtime","0:00","timer"}}
+					local metrics=Settings.Metrics or defaults
+					for index=1,8 do
+						local data=metrics[index] or defaults[index]
+						local cell=Instance.new("Frame"); cell.BackgroundTransparency=1; cell.LayoutOrder=index; cell.Parent=metricHolder
+						local icon=Instance.new("ImageLabel"); icon.BackgroundColor3=accentColor; icon.BackgroundTransparency=.84; icon.Position=UDim2.fromOffset(8,9); icon.Size=UDim2.fromOffset(24,24); icon.Parent=cell
+						local iconCorner=Instance.new("UICorner"); iconCorner.CornerRadius=UDim.new(1,0); iconCorner.Parent=icon; MacLib:ApplyIcon(icon,data.Icon or data[3] or "circle",accentColor)
+						local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Position=UDim2.fromOffset(39,5); value.Size=UDim2.new(1,-42,0,18); value.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); value.TextSize=11; value.TextColor3=Color3.fromRGB(244,244,244); value.TextXAlignment=Enum.TextXAlignment.Left; value.Text=tostring(data.Value or data[2] or "-"); value.Parent=cell
+						local label=Instance.new("TextLabel"); label.BackgroundTransparency=1; label.Position=UDim2.fromOffset(39,22); label.Size=UDim2.new(1,-42,0,14); label.FontFace=Font.new(assets.interFont); label.TextSize=9; label.TextTransparency=.58; label.TextColor3=Color3.new(1,1,1); label.TextXAlignment=Enum.TextXAlignment.Left; label.Text=tostring(data.Label or data[1] or ""); label.Parent=cell
+						labels[index]=value
+						labels[string.lower(label.Text)]=value
+					end
+					function API:SetMetric(name,value) local target=type(name)=="number" and labels[name] or labels[string.lower(tostring(name))]; if target then target.Text=tostring(value) end end
+					function API:SetStatus(text,color) badge.Text=tostring(text or ""); if color then badge.TextColor3=color; badge.BackgroundColor3=color end end
+					function API:SetTitle(text) heading.Text=tostring(text or "") end
+					function API:SetVisibility(state) card.Visible=state==true end
+					if Settings.Live ~= false then
+						task.spawn(function()
+							local frames,lastFrames,lastTime=0,0,os.clock()
+							local renderConnection=RunService.RenderStepped:Connect(function() frames=frames+1 end)
+							while card.Parent and macLib.Parent do
+								local now=os.clock(); local elapsed=math.max(now-lastTime,.01); API:SetMetric("FPS",math.floor((frames-lastFrames)/elapsed+.5)); lastFrames=frames; lastTime=now
+								local ping=0; pcall(function() ping=math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()+.5) end); API:SetMetric("Ping",ping.." ms")
+								local executor="Unknown"; pcall(function() if identifyexecutor then executor=tostring((identifyexecutor())) end end); API:SetMetric("Executor",executor)
+								API:SetMetric("Players",#Players:GetPlayers().." / "..Players.MaxPlayers); API:SetMetric("Time",os.date("%H:%M"))
+								local seconds=math.floor(os.clock()-windowStartedAt); API:SetMetric("Runtime",string.format("%d:%02d",math.floor(seconds/60),seconds%60)); task.wait(1)
+							end
+							renderConnection:Disconnect()
+						end)
+					end
+					return API
+				end
+
+				-- Inventory/gallery cards with explicit unavailable/owned state.
+				function SectionFunctions:ItemGrid(Settings)
+					Settings=Settings or {}; local API={}; local height=tonumber(Settings.Height) or 260
+					local card=createModernCard("ItemGrid",height)
+					local heading=Instance.new("TextLabel"); heading.BackgroundTransparency=1; heading.Position=UDim2.fromOffset(12,8); heading.Size=UDim2.new(1,-24,0,20); heading.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); heading.TextSize=12; heading.TextColor3=Color3.fromRGB(245,245,245); heading.TextXAlignment=Enum.TextXAlignment.Left; heading.Text=tostring(Settings.Title or "Items"); heading.Parent=card
+					local scroll=Instance.new("ScrollingFrame"); scroll.BackgroundTransparency=1; scroll.BorderSizePixel=0; scroll.Position=UDim2.fromOffset(10,35); scroll.Size=UDim2.new(1,-20,1,-45); scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y; scroll.CanvasSize=UDim2.new(); scroll.ScrollBarThickness=2; scroll.Parent=card
+					local layout=Instance.new("UIGridLayout"); layout.CellPadding=UDim2.fromOffset(7,7); layout.CellSize=Settings.CellSize or UDim2.fromOffset(92,108); layout.SortOrder=Enum.SortOrder.LayoutOrder; layout.Parent=scroll
+					local items={}
+					local function addItem(data,index)
+						local item=Instance.new("TextButton"); item.AutoButtonColor=false; item.Text=""; item.BackgroundColor3=Color3.fromRGB(22,21,24); item.BackgroundTransparency=.18; item.LayoutOrder=index; item.Parent=scroll
+						local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,8); corner.Parent=item
+						local itemStroke=Instance.new("UIStroke"); itemStroke.Color=(data.Owned==true) and Color3.fromRGB(45,204,135) or Color3.fromRGB(235,89,89); itemStroke.Transparency=.18; itemStroke.Parent=item
+						local image=Instance.new("ImageLabel"); image.BackgroundTransparency=1; image.Position=UDim2.fromOffset(14,10); image.Size=UDim2.new(1,-28,0,54); image.ScaleType=Enum.ScaleType.Fit; image.Parent=item; MacLib:ApplyIcon(image,data.Image or data.Icon or "",Color3.new(1,1,1))
+						local name=Instance.new("TextLabel"); name.BackgroundTransparency=1; name.Position=UDim2.fromOffset(5,67); name.Size=UDim2.new(1,-10,0,28); name.FontFace=Font.new(assets.interFont); name.TextSize=9; name.TextWrapped=true; name.TextColor3=Color3.fromRGB(225,225,225); name.Text=tostring(data.Name or data.Title or "Item"); name.Parent=item
+						local state=Instance.new("TextLabel"); state.AnchorPoint=Vector2.new(1,0); state.Position=UDim2.new(1,-5,0,5); state.Size=UDim2.fromOffset(20,20); state.BackgroundColor3=(data.Owned==true) and Color3.fromRGB(35,193,127) or Color3.fromRGB(238,91,91); state.Text=(data.Owned==true) and "v" or "x"; state.TextColor3=Color3.new(1,1,1); state.TextSize=12; state.FontFace=Font.new(assets.interFont,Enum.FontWeight.Bold); state.Parent=item
+						local stateCorner=Instance.new("UICorner"); stateCorner.CornerRadius=UDim.new(1,0); stateCorner.Parent=state
+						local bar=Instance.new("Frame"); bar.AnchorPoint=Vector2.new(.5,1); bar.Position=UDim2.new(.5,0,1,-5); bar.Size=UDim2.new(.55,0,0,3); bar.BorderSizePixel=0; bar.BackgroundColor3=data.Color or accentColor; bar.Parent=item
+						local barCorner=Instance.new("UICorner"); barCorner.CornerRadius=UDim.new(1,0); barCorner.Parent=bar
+						items[tostring(data.Id or data.Name or data.Title or index)]={Button=item,State=state,Stroke=itemStroke,Data=data}
+						item.MouseButton1Click:Connect(function() if Settings.Callback then task.spawn(Settings.Callback,data,API) end end)
+					end
+					function API:SetItems(values) for _,value in pairs(items) do value.Button:Destroy() end; table.clear(items); for index,data in ipairs(values or {}) do addItem(data,index) end end
+					function API:SetOwned(id,owned) local value=items[tostring(id)]; if not value then return end; value.State.Text=owned and "v" or "x"; value.State.BackgroundColor3=owned and Color3.fromRGB(35,193,127) or Color3.fromRGB(238,91,91); value.Stroke.Color=owned and Color3.fromRGB(45,204,135) or Color3.fromRGB(235,89,89) end
+					function API:SetVisibility(state) card.Visible=state==true end
+					API:SetItems(Settings.Items or Settings.Values or {}); return API
+				end
+
+				-- Rich feature state card. SetActive records the start time and exposes it
+				-- to the optional telemetry launcher.
+				function SectionFunctions:FeatureStatus(Settings)
+					Settings=Settings or {}; local API={}; local color=Settings.Color or accentColor; local card=createModernCard("FeatureStatus",118); local startedAt
+					local icon=Instance.new("ImageLabel"); icon.BackgroundColor3=color; icon.BackgroundTransparency=.75; icon.Position=UDim2.fromOffset(13,13); icon.Size=UDim2.fromOffset(46,46); icon.Parent=card; local iconCorner=Instance.new("UICorner"); iconCorner.CornerRadius=UDim.new(1,0); iconCorner.Parent=icon; MacLib:ApplyIcon(icon,Settings.Icon or "activity",color)
+					local title=Instance.new("TextLabel"); title.BackgroundTransparency=1; title.Position=UDim2.fromOffset(70,13); title.Size=UDim2.new(1,-155,0,21); title.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); title.TextSize=14; title.TextColor3=Color3.fromRGB(246,246,246); title.TextXAlignment=Enum.TextXAlignment.Left; title.Text=tostring(Settings.Title or "Feature is off"); title.Parent=card
+					local description=Instance.new("TextLabel"); description.BackgroundTransparency=1; description.Position=UDim2.fromOffset(70,36); description.Size=UDim2.new(1,-85,0,18); description.FontFace=Font.new(assets.interFont); description.TextSize=10; description.TextTransparency=.52; description.TextColor3=Color3.new(1,1,1); description.TextXAlignment=Enum.TextXAlignment.Left; description.Text=tostring(Settings.Description or "Turn on a feature below"); description.Parent=card
+					local badge=Instance.new("TextLabel"); badge.AnchorPoint=Vector2.new(1,0); badge.Position=UDim2.new(1,-12,0,17); badge.Size=UDim2.fromOffset(55,21); badge.BackgroundColor3=Color3.fromRGB(255,255,255); badge.BackgroundTransparency=.9; badge.TextColor3=Color3.fromRGB(210,210,210); badge.TextSize=9; badge.Text="IDLE"; badge.Parent=card; local badgeCorner=Instance.new("UICorner"); badgeCorner.CornerRadius=UDim.new(1,0); badgeCorner.Parent=badge
+					local stats=Instance.new("Frame"); stats.BackgroundColor3=Color3.fromRGB(5,6,8); stats.BackgroundTransparency=.46; stats.Position=UDim2.fromOffset(13,70); stats.Size=UDim2.new(1,-26,0,35); stats.Parent=card; local statsCorner=Instance.new("UICorner"); statsCorner.CornerRadius=UDim.new(0,9); statsCorner.Parent=stats
+					local statsGrid=Instance.new("UIGridLayout"); statsGrid.CellSize=UDim2.new(.25,0,1,0); statsGrid.Parent=stats; local labels={}
+					for index,data in ipairs(Settings.Metrics or {{Label="Runtime",Value="-"},{Label="Target",Value="-"},{Label="Count",Value="0"},{Label="State",Value="Idle"}}) do
+						local holder=Instance.new("Frame"); holder.BackgroundTransparency=1; holder.LayoutOrder=index; holder.Parent=stats
+						local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Position=UDim2.fromOffset(5,4); value.Size=UDim2.new(1,-10,0,15); value.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); value.TextSize=10; value.TextColor3=Color3.fromRGB(240,240,240); value.Text=tostring(data.Value or "-"); value.Parent=holder
+						local label=Instance.new("TextLabel"); label.BackgroundTransparency=1; label.Position=UDim2.fromOffset(5,18); label.Size=UDim2.new(1,-10,0,12); label.FontFace=Font.new(assets.interFont); label.TextSize=8; label.TextTransparency=.6; label.TextColor3=Color3.new(1,1,1); label.Text=tostring(data.Label or ""); label.Parent=holder; labels[index]=value; labels[string.lower(label.Text)]=value
+					end
+					function API:SetMetric(name,value) local target=type(name)=="number" and labels[name] or labels[string.lower(tostring(name))]; if target then target.Text=tostring(value) end end
+					function API:SetActive(state,name)
+						if state then startedAt=startedAt or os.clock(); badge.Text="ACTIVE"; badge.TextColor3=Color3.fromRGB(69,224,139); title.Text=tostring(name or Settings.ActiveTitle or Settings.Title or "Feature is running"); WindowFunctions:SetActivity(Settings.ActivityName or title.Text,true,description.Text)
+						else startedAt=nil; badge.Text="IDLE"; badge.TextColor3=Color3.fromRGB(210,210,210); WindowFunctions:SetActivity(Settings.ActivityName or title.Text,false) end
+					end
+					function API:SetTitle(value) title.Text=tostring(value or "") end; function API:SetDescription(value) description.Text=tostring(value or "") end; function API:SetVisibility(state) card.Visible=state==true end
+					task.spawn(function() while card.Parent and macLib.Parent do if startedAt then local seconds=math.floor(os.clock()-startedAt); API:SetMetric("Runtime",string.format("%d:%02d",math.floor(seconds/60),seconds%60)) end; task.wait(1) end end)
+					API:SetActive(Settings.Active==true); return API
+				end
+
 				function SectionFunctions:ButtonRow(Settings)
 					Settings = Settings or {}
 					local RowFunctions = { Buttons = {} }
@@ -7256,8 +7403,13 @@ function MacLib:Window(Settings)
 	local onUnloadCallback
 
 	function WindowFunctions:Unload()
+		for index = #cleanupCallbacks, 1, -1 do
+			pcall(cleanupCallbacks[index])
+		end
+		table.clear(cleanupCallbacks)
+		table.clear(activityRegistry)
 		if onUnloadCallback then
-			onUnloadCallback()  
+			pcall(onUnloadCallback)
 		end
 		macLib:Destroy()
 	end
@@ -7284,9 +7436,10 @@ function MacLib:Window(Settings)
 		local openSettings = Settings.OpenButton
 		if openSettings ~= false then
 			if type(openSettings) ~= "table" then openSettings = {} end
+			local openStyle = string.lower(tostring(openSettings.Style or "Graph"))
 			openButtonEnabled = openSettings.Enabled ~= false
 			local openColor = openSettings.Color or Color3.fromRGB(225, 227, 232)
-			local openButtonSize = openSettings.Size or UDim2.fromOffset(96, 30)
+			local openButtonSize = openSettings.Size or ((openStyle == "statusbar" or openStyle == "telemetry") and UDim2.fromOffset(520, 42) or UDim2.fromOffset(96, 30))
 			local bounceHeight = tonumber(openSettings.BounceHeight) or 3
 			local bounceSpeed = math.max(tonumber(openSettings.BounceSpeed) or 1.05, 0.25)
 			local pulseSpeed = math.max(tonumber(openSettings.PulseSpeed) or 1.45, 0.4)
@@ -7369,6 +7522,51 @@ function MacLib:Window(Settings)
 			chart.Size = UDim2.new(1, -20, 1, -12)
 			chart.ZIndex = 253
 			chart.Parent = launcher
+			local getPlayerPing
+
+			if openStyle == "statusbar" or openStyle == "telemetry" then
+				chart.Visible = false
+				launcherCorner.CornerRadius = UDim.new(0, 7)
+				local logo = Instance.new("ImageLabel")
+				logo.BackgroundColor3 = Color3.fromRGB(8, 10, 14); logo.BackgroundTransparency = .2
+				logo.Position = UDim2.fromOffset(5, 4); logo.Size = UDim2.fromOffset(34, 34); logo.ScaleType = Enum.ScaleType.Fit
+				logo.Image = tostring(openSettings.Logo or Settings.Icon or ""); logo.ZIndex = 256; logo.Parent = launcher
+				local logoCorner = Instance.new("UICorner"); logoCorner.CornerRadius = UDim.new(0, 5); logoCorner.Parent = logo
+				local modeIcon = Instance.new("ImageLabel"); modeIcon.BackgroundTransparency=1; modeIcon.Position=UDim2.fromOffset(49,12); modeIcon.Size=UDim2.fromOffset(16,16); modeIcon.ZIndex=256; modeIcon.Parent=launcher; MacLib:ApplyIcon(modeIcon,"activity",openColor)
+				local primary = Instance.new("TextLabel"); primary.BackgroundTransparency=1; primary.Position=UDim2.fromOffset(70,5); primary.Size=UDim2.fromOffset(230,17); primary.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); primary.TextSize=10; primary.TextColor3=Color3.fromRGB(235,240,246); primary.TextXAlignment=Enum.TextXAlignment.Left; primary.Text="NNVN Hub"; primary.ZIndex=256; primary.Parent=launcher
+				local secondary = Instance.new("TextLabel"); secondary.BackgroundTransparency=1; secondary.Position=UDim2.fromOffset(70,21); secondary.Size=UDim2.fromOffset(230,15); secondary.FontFace=Font.new(assets.interFont); secondary.TextSize=9; secondary.TextColor3=openColor; secondary.TextXAlignment=Enum.TextXAlignment.Left; secondary.Text="Ready"; secondary.ZIndex=256; secondary.Parent=launcher
+				local keyBox=Instance.new("Frame"); keyBox.BackgroundColor3=Color3.fromRGB(12,15,20); keyBox.BackgroundTransparency=.12; keyBox.Position=UDim2.new(1,-205,0,4); keyBox.Size=UDim2.fromOffset(100,34); keyBox.ZIndex=256; keyBox.Parent=launcher; local keyCorner=Instance.new("UICorner"); keyCorner.CornerRadius=UDim.new(0,5); keyCorner.Parent=keyBox
+				local keyTitle=Instance.new("TextLabel"); keyTitle.BackgroundTransparency=1; keyTitle.Position=UDim2.fromOffset(6,2); keyTitle.Size=UDim2.new(1,-12,0,12); keyTitle.FontFace=Font.new(assets.interFont); keyTitle.TextSize=8; keyTitle.TextColor3=openColor; keyTitle.Text="OPEN"; keyTitle.TextXAlignment=Enum.TextXAlignment.Left; keyTitle.ZIndex=257; keyTitle.Parent=keyBox
+				local keyValue=Instance.new("TextLabel"); keyValue.BackgroundTransparency=1; keyValue.Position=UDim2.fromOffset(6,14); keyValue.Size=UDim2.new(1,-12,0,16); keyValue.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); keyValue.TextSize=9; keyValue.TextColor3=Color3.fromRGB(240,240,240); keyValue.Text=tostring(MenuKeybind.Name):upper(); keyValue.TextXAlignment=Enum.TextXAlignment.Left; keyValue.ZIndex=257; keyValue.Parent=keyBox
+
+				local pinned=false
+				local launcherLocked=false
+				local function actionButton(offset, iconName, callback)
+					local button=Instance.new("ImageButton"); button.AutoButtonColor=false; button.BackgroundColor3=Color3.fromRGB(12,15,20); button.BackgroundTransparency=.1; button.Position=UDim2.new(1,offset,0,4); button.Size=UDim2.fromOffset(30,34); button.ZIndex=260; button.Parent=motion
+					local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,5); corner.Parent=button; MacLib:ApplyIcon(button,iconName,openColor)
+					button.MouseButton1Click:Connect(callback); return button
+				end
+				local lockButton
+				lockButton=actionButton(-99,"lock",function()
+					launcherLocked=not launcherLocked
+					MacLib:ApplyIcon(lockButton,launcherLocked and "lock-keyhole" or "lock-keyhole-open",openColor)
+				end)
+				actionButton(-65,"pin",function() pinned=not pinned; openButtonContainer.Position=pinned and UDim2.new(.5,0,0,8) or (openSettings.Position or UDim2.new(.5,0,0,18)) end)
+				actionButton(-31,"monitor",ToggleMenu)
+
+				task.spawn(function()
+					local frameCount,lastCount,lastSample=0,0,os.clock(); local fps=0; local connection=RunService.RenderStepped:Connect(function() frameCount=frameCount+1 end); local mode=0
+					while launcher.Parent and macLib.Parent do
+						local now=os.clock(); if now-lastSample>=1 then fps=math.floor((frameCount-lastCount)/(now-lastSample)+.5); lastCount=frameCount; lastSample=now end
+						mode=(mode%3)+1; local activities=WindowFunctions:GetActivities(); local current=activities[1]
+						if mode==1 and current then local elapsed=math.floor(now-current.StartedAt); primary.Text="Running  "..current.Name; secondary.Text=current.Detail.."  "..string.format("%d:%02d",math.floor(elapsed/60),elapsed%60); MacLib:ApplyIcon(modeIcon,"play",openColor)
+						elseif mode==2 then local ping=getPlayerPing(); primary.Text="FPS  "..fps.."    PING  "..math.floor(ping+.5).." ms"; local runtime=math.floor(now-windowStartedAt); secondary.Text="Runtime  "..string.format("%d:%02d",math.floor(runtime/60),runtime%60); MacLib:ApplyIcon(modeIcon,"chart-no-axes-column-increasing",openColor)
+						else primary.Text=tostring(openSettings.Credits or Settings.Title or "NNVN Hub"); secondary.Text=tostring(openSettings.Author or Settings.Author or "Ready"); MacLib:ApplyIcon(modeIcon,"sparkles",openColor) end
+						task.wait(math.max(tonumber(openSettings.RotateEvery) or 3.2,1))
+					end
+					connection:Disconnect()
+				end)
+			end
 
 			for row = 1, 3 do
 				local grid = Instance.new("Frame")
@@ -7414,7 +7612,7 @@ function MacLib:Window(Settings)
 				graphDots[index] = dot
 			end
 
-			local function getPlayerPing()
+			getPlayerPing = function()
 				local ok, value = pcall(function()
 					return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
 				end)
@@ -7507,6 +7705,7 @@ function MacLib:Window(Settings)
 			local moved = false
 			if openSettings.Draggable ~= false then
 				launcher.InputBegan:Connect(function(input)
+					if launcherLocked then return end
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
 						moved = false
@@ -7717,6 +7916,79 @@ function MacLib:Window(Settings)
 		local scale = math.clamp((tonumber(Percent) or 100) / 100, 0.5, 2)
 		baseUIScale.Scale = scale
 		return scale
+	end
+
+	-- Compact account/settings popover opened from the user card in the sidebar.
+	-- It intentionally exposes only presentation controls; scripts may subscribe to
+	-- language changes without coupling their logic to the library.
+	do
+		local profileOpen = false
+		local profile = Instance.new("Frame")
+		profile.Name = "ProfileMenu"
+		profile.AnchorPoint = Vector2.new(0, 1)
+		profile.BackgroundColor3 = Color3.fromRGB(12, 13, 16)
+		profile.BackgroundTransparency = 0.06
+		profile.BorderSizePixel = 0
+		profile.Position = UDim2.new(0, 10, 1, -62)
+		profile.Size = UDim2.fromOffset(226, 334)
+		profile.Visible = false
+		profile.ZIndex = 310
+		profile.Parent = base
+		local profileCorner = Instance.new("UICorner"); profileCorner.CornerRadius = UDim.new(0, 11); profileCorner.Parent = profile
+		local profileStroke = Instance.new("UIStroke"); profileStroke.Color = accentColor; profileStroke.Transparency = 0.48; profileStroke.Thickness = 1; profileStroke.Parent = profile
+		registerAccent(function(color) profileStroke.Color = color end)
+
+		local avatar = Instance.new("ImageLabel")
+		avatar.BackgroundTransparency = 1; avatar.Position = UDim2.fromOffset(13, 12); avatar.Size = UDim2.fromOffset(38, 38)
+		avatar.Image = headshot.Image; avatar.ZIndex = 312; avatar.Parent = profile
+		local avatarCorner = Instance.new("UICorner"); avatarCorner.CornerRadius = UDim.new(1, 0); avatarCorner.Parent = avatar
+		local profileName = Instance.new("TextLabel")
+		profileName.BackgroundTransparency = 1; profileName.Position = UDim2.fromOffset(60, 12); profileName.Size = UDim2.new(1, -72, 0, 20)
+		profileName.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold); profileName.Text = displayName.Text; profileName.TextColor3 = Color3.fromRGB(242, 242, 245); profileName.TextSize = 12; profileName.TextXAlignment = Enum.TextXAlignment.Left; profileName.ZIndex = 312; profileName.Parent = profile
+		local profileUser = Instance.new("TextLabel")
+		profileUser.BackgroundTransparency = 1; profileUser.Position = UDim2.fromOffset(60, 31); profileUser.Size = UDim2.new(1, -72, 0, 16)
+		profileUser.FontFace = Font.new(assets.interFont); profileUser.Text = username.Text; profileUser.TextColor3 = Color3.fromRGB(150, 153, 160); profileUser.TextSize = 9; profileUser.TextXAlignment = Enum.TextXAlignment.Left; profileUser.ZIndex = 312; profileUser.Parent = profile
+		local divider = Instance.new("Frame"); divider.BackgroundColor3 = Color3.fromRGB(255,255,255); divider.BackgroundTransparency=.86; divider.BorderSizePixel=0; divider.Position=UDim2.fromOffset(12,59); divider.Size=UDim2.new(1,-24,0,1); divider.ZIndex=312; divider.Parent=profile
+
+		local rowY = 68
+		local function row(iconName, titleText, valueText, callback, danger)
+			local button = Instance.new("TextButton")
+			button.AutoButtonColor=false; button.BackgroundColor3=Color3.fromRGB(27,28,33); button.BackgroundTransparency=.28; button.BorderSizePixel=0
+			button.Position=UDim2.fromOffset(10,rowY); button.Size=UDim2.new(1,-20,0,32); button.Text=""; button.ZIndex=312; button.Parent=profile
+			local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,7); corner.Parent=button
+			local icon=Instance.new("ImageLabel"); icon.BackgroundTransparency=1; icon.Position=UDim2.fromOffset(9,8); icon.Size=UDim2.fromOffset(16,16); icon.ZIndex=313; icon.Parent=button; MacLib:ApplyIcon(icon,iconName,danger and Color3.fromRGB(241,91,91) or Color3.fromRGB(190,193,201))
+			local label=Instance.new("TextLabel"); label.BackgroundTransparency=1; label.Position=UDim2.fromOffset(34,0); label.Size=UDim2.new(.52,-34,1,0); label.FontFace=Font.new(assets.interFont); label.Text=titleText; label.TextColor3=danger and Color3.fromRGB(241,91,91) or Color3.fromRGB(225,226,230); label.TextSize=10; label.TextXAlignment=Enum.TextXAlignment.Left; label.ZIndex=313; label.Parent=button
+			local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Position=UDim2.new(.52,0,0,0); value.Size=UDim2.new(.48,-20,1,0); value.FontFace=Font.new(assets.interFont); value.Text=tostring(valueText or ""); value.TextColor3=danger and Color3.fromRGB(241,91,91) or Color3.fromRGB(165,168,176); value.TextSize=9; value.TextXAlignment=Enum.TextXAlignment.Right; value.ZIndex=313; value.Parent=button
+			if not danger then local arrow=Instance.new("TextLabel"); arrow.BackgroundTransparency=1; arrow.Position=UDim2.new(1,-17,0,0); arrow.Size=UDim2.fromOffset(12,32); arrow.FontFace=Font.new(assets.interFont); arrow.Text=">"; arrow.TextColor3=Color3.fromRGB(125,128,136); arrow.TextSize=12; arrow.ZIndex=313; arrow.Parent=button end
+			button.MouseEnter:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.08}):Play() end)
+			button.MouseLeave:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.28}):Play() end)
+			button.MouseButton1Click:Connect(function() if callback then callback(value) end end)
+			rowY = rowY + 36
+			return value
+		end
+
+		local themes={{"Graphite",Color3.fromRGB(18,19,23)},{"Midnight",Color3.fromRGB(10,16,27)},{"Ember",Color3.fromRGB(27,17,13)}}
+		local themeIndex=1
+		row("sun","Interface",themes[themeIndex][1],function(value) themeIndex=themeIndex%#themes+1; value.Text=themes[themeIndex][1]; base.BackgroundColor3=themes[themeIndex][2] end)
+		local accents={Color3.fromRGB(120,150,255),Color3.fromRGB(255,132,46),Color3.fromRGB(63,211,163),Color3.fromRGB(225,225,230)}
+		local accentIndex=1
+		row("palette","Accent","Preset 1",function(value) accentIndex=accentIndex%#accents+1; value.Text="Preset "..accentIndex; WindowFunctions:SetAccent(accents[accentIndex]) end)
+		local scales={.85,1,1.1}; local scaleIndex=2
+		row("maximize-2","Menu Scale","100%",function(value) scaleIndex=scaleIndex%#scales+1; WindowFunctions:SetScale(scales[scaleIndex]); value.Text=math.floor(scales[scaleIndex]*100).."%" end)
+		local languages={"English","Vietnamese"}; local languageIndex=1
+		row("globe","Language",languages[languageIndex],function(value) languageIndex=languageIndex%#languages+1; value.Text=languages[languageIndex]; if type(Settings.OnLanguageChanged)=="function" then pcall(Settings.OnLanguageChanged,languages[languageIndex]) end end)
+		local keys={{"Right Ctrl",Enum.KeyCode.RightControl},{"Left Ctrl",Enum.KeyCode.LeftControl},{"Insert",Enum.KeyCode.Insert}}; local keyIndex=1
+		row("keyboard","Menu Key",keys[keyIndex][1],function(value) keyIndex=keyIndex%#keys+1; value.Text=keys[keyIndex][1]; WindowFunctions:SetKeybind(keys[keyIndex][2]) end)
+		local views={{"Free",Enum.CameraType.Custom},{"Follow",Enum.CameraType.Follow}}; local viewIndex=1
+		row("video","Camera View",views[viewIndex][1],function(value) viewIndex=viewIndex%#views+1; value.Text=views[viewIndex][1]; pcall(function() workspace.CurrentCamera.CameraType=views[viewIndex][2] end) end)
+		row("power","Shut Down","",function() profile.Visible=false; profileOpen=false; WindowFunctions:Dialog({Title="Unload Script?",Description="This closes the menu and stops every registered feature.",Buttons={{Name="Cancel"},{Name="Unload",Callback=function() WindowFunctions:Unload() end}}}) end,true)
+
+		local profileHitbox = Instance.new("TextButton")
+		profileHitbox.Name="ProfileMenuButton"; profileHitbox.BackgroundTransparency=1; profileHitbox.Size=UDim2.fromScale(1,1); profileHitbox.Text=""; profileHitbox.ZIndex=40; profileHitbox.Parent=userInfo
+		profileHitbox.MouseButton1Click:Connect(function()
+			profileOpen=not profileOpen; profile.Visible=profileOpen
+			avatar.Image=headshot.Image; profileName.Text=displayName.Text; profileUser.Text=username.Text
+		end)
 	end
 
 	local backgroundImage
@@ -8931,6 +9203,9 @@ do
 		end
 		section.AddProgressBar = section.AddProgressBar or function(self, opts) return self:ProgressBar(opts or {}) end
 		section.AddStatus = section.AddStatus or function(self, opts) return self:Status(opts or {}) end
+		section.AddOverview = section.AddOverview or function(self, opts) return self:Overview(opts or {}) end
+		section.AddItemGrid = section.AddItemGrid or function(self, opts) return self:ItemGrid(opts or {}) end
+		section.AddFeatureStatus = section.AddFeatureStatus or function(self, opts) return self:FeatureStatus(opts or {}) end
 		section.AddButtonRow = section.AddButtonRow or function(self, opts) return self:ButtonRow(opts or {}) end
 		section.AddSegmented = section.AddSegmented or function(self, idOrOpts, maybeOpts)
 			local _, opts = mergeIdOptions(idOrOpts, maybeOpts)
@@ -9145,6 +9420,10 @@ do
 		local window = nativeWindow(self, {
 			Title = tostring(first(settings.Title, settings.Name, "MacLib")),
 			Subtitle = tostring(first(settings.Subtitle, settings.SubTitle, settings.Author, settings.Description, "")),
+			Author = settings.Author,
+			Icon = settings.Icon,
+			Sounds = settings.Sounds,
+			OnLanguageChanged = settings.OnLanguageChanged,
 			Size = settings.Size,
 			Accent = settings.Accent,
 			DragStyle = settings.DragStyle,
