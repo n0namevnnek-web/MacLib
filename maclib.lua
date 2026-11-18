@@ -6618,6 +6618,7 @@ function MacLib:Window(Settings)
 			holder.BorderSizePixel = 0
 			holder.ClipsDescendants = true
 			holder.Size = UDim2.new(1, 0, 0, headerHeight)
+			holder.LayoutOrder = tonumber(Settings.Order or Settings.LayoutOrder) or 0
 			holder.Parent = sectionTabSwitchers
 
 			local header = Instance.new("TextButton")
@@ -6647,8 +6648,10 @@ function MacLib:Window(Settings)
 			local arrow = Instance.new("TextLabel")
 			arrow.Name="Arrow"; arrow.BackgroundTransparency=1; arrow.AnchorPoint=Vector2.new(.5,.5)
 			arrow.Position=UDim2.new(1,-25,.5,0); arrow.Size=UDim2.fromOffset(20,20)
-			arrow.Font=Enum.Font.GothamBold; arrow.Text="⌄"; arrow.TextSize=17
-			arrow.TextColor3=Color3.fromRGB(205,207,214); arrow.Rotation=group.Expanded and 0 or -90; arrow.Parent=header
+			-- ASCII arrows render consistently on executors whose fallback font does
+			-- not contain the previous Unicode chevron glyph.
+			arrow.Font=Enum.Font.GothamBold; arrow.Text=group.Expanded and "v" or ">"; arrow.TextSize=14
+			arrow.TextColor3=Color3.fromRGB(205,207,214); arrow.Rotation=0; arrow.Parent=header
 
 			local children = Instance.new("Frame")
 			children.Name="Children"; children.BackgroundTransparency=1; children.BorderSizePixel=0
@@ -6665,7 +6668,8 @@ function MacLib:Window(Settings)
 				local info=TweenInfo.new(instant and 0 or .22,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
 				Tween(children,info,{Size=UDim2.new(1,0,0,h)}):Play()
 				Tween(holder,info,{Size=UDim2.new(1,0,0,headerHeight+h)}):Play()
-				Tween(arrow,info,{Rotation=group.Expanded and 0 or -90}):Play()
+				arrow.Text=group.Expanded and "v" or ">"
+				Tween(arrow,info,{TextTransparency=0}):Play()
 			end
 			function group:Add(tab, name, childIcon)
 				if type(tab)~="table" or not tab.DockButton then return tab end
@@ -9302,6 +9306,26 @@ do
 			local logo=add(Instance.new("ImageLabel")); logo.AnchorPoint=Vector2.new(.5,.5); logo.Position=UDim2.fromScale(.5,.39)
 			logo.Size=UDim2.fromOffset(142,142); logo.BackgroundTransparency=1; logo.Image=tostring(options.Logo or "")
 			logo.ImageTransparency=1; logo.Parent=center
+
+			-- Split a second copy of the logo into clipped cells. The cells fly
+			-- apart at the end, creating a true shatter instead of a plain fade.
+			local fragmentLayer=Instance.new("Frame")
+			fragmentLayer.AnchorPoint=Vector2.new(.5,.5); fragmentLayer.Position=UDim2.fromScale(.5,.39)
+			fragmentLayer.Size=UDim2.fromOffset(158,158); fragmentLayer.BackgroundTransparency=1
+			fragmentLayer.Visible=false; fragmentLayer.Parent=center
+			local fragments={}
+			for row=0,3 do
+				for column=0,3 do
+					local cell=Instance.new("Frame")
+					cell.BackgroundTransparency=1; cell.BorderSizePixel=0; cell.ClipsDescendants=true
+					cell.Position=UDim2.fromScale(column/4,row/4); cell.Size=UDim2.fromScale(.25,.25); cell.Parent=fragmentLayer
+					local piece=Instance.new("ImageLabel")
+					piece.BackgroundTransparency=1; piece.Size=UDim2.fromScale(4,4)
+					piece.Position=UDim2.fromScale(-column,-row); piece.Image=tostring(options.Logo or "")
+					piece.Parent=cell
+					fragments[#fragments+1]={Cell=cell,Piece=piece,Column=column,Row=row}
+				end
+			end
 			TS:Create(glow,TweenInfo.new(.8,Enum.EasingStyle.Quint),{ImageTransparency=.72,Size=UDim2.fromOffset(235,235)}):Play()
 			TS:Create(logo,TweenInfo.new(.6,Enum.EasingStyle.Quint),{ImageTransparency=0,Size=UDim2.fromOffset(158,158)}):Play()
 
@@ -9351,6 +9375,31 @@ do
 			local started=os.clock(); repeat task.wait(.03) until done or os.clock()-started>=duration
 			if rememberChoice and writefile then pcall(function() if makefolder then pcall(makefolder,"MacLib") end; writefile(rememberFile,"1") end) end
 			for _,connection in ipairs(connections) do connection:Disconnect() end
+			if options.Shatter ~= false and not done then
+				local rng=Random.new()
+				fragmentLayer.Visible=true; logo.Visible=false
+				for i=1,18 do
+					local crack=Instance.new("Frame")
+					crack.AnchorPoint=Vector2.new(0,.5); crack.Position=UDim2.fromScale(.5,.39)
+					crack.Size=UDim2.fromOffset(0,i%3==0 and 2 or 1); crack.Rotation=rng:NextNumber(0,360)
+					crack.BackgroundColor3=(i%2==0 and accent or Color3.fromRGB(245,245,250))
+					crack.BackgroundTransparency=.08; crack.BorderSizePixel=0; crack.Parent=center
+					TS:Create(crack,TweenInfo.new(.24,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{
+						Size=UDim2.fromOffset(rng:NextInteger(70,165),crack.Size.Y.Offset),BackgroundTransparency=1
+					}):Play()
+					task.delay(.3,function() if crack then crack:Destroy() end end)
+				end
+				for _,fragment in ipairs(fragments) do
+					local dx=(fragment.Column-1.5)*rng:NextInteger(25,48)+rng:NextInteger(-22,22)
+					local dy=(fragment.Row-1.5)*rng:NextInteger(22,44)+rng:NextInteger(-18,18)
+					TS:Create(fragment.Cell,TweenInfo.new(.34,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{
+						Position=fragment.Cell.Position+UDim2.fromOffset(dx,dy),Rotation=rng:NextInteger(-80,80)
+					}):Play()
+					TS:Create(fragment.Piece,TweenInfo.new(.3),{ImageTransparency=1}):Play()
+				end
+				TS:Create(scale,TweenInfo.new(.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Scale=1.08}):Play()
+				task.wait(.3)
+			end
 			TS:Create(shade,TweenInfo.new(.35),{BackgroundTransparency=1}):Play()
 			for _,object in ipairs(fade) do
 				if object:IsA("ImageLabel") then TS:Create(object,TweenInfo.new(.28),{ImageTransparency=1}):Play()
