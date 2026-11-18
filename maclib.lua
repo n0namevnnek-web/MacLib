@@ -1726,10 +1726,17 @@ function MacLib:Window(Settings)
 		local themeLayout=Instance.new("UIListLayout"); themeLayout.Padding=UDim.new(0,3); themeLayout.Parent=themePopup
 		local themePadding=Instance.new("UIPadding"); themePadding.PaddingTop=UDim.new(0,6); themePadding.PaddingBottom=UDim.new(0,6); themePadding.PaddingLeft=UDim.new(0,6); themePadding.PaddingRight=UDim.new(0,6); themePadding.Parent=themePopup
 		local palettes={
+			{"Spectrum",Color3.fromRGB(176,105,255),Color3.fromRGB(11,9,17)},
 			{"Midnight",Color3.fromRGB(65,120,210),Color3.fromRGB(10,13,20)},
 			{"Ember",Color3.fromRGB(255,119,32),Color3.fromRGB(18,12,10)},
 			{"Abyss",Color3.fromRGB(38,185,196),Color3.fromRGB(8,15,17)},
-			{"Snow",Color3.fromRGB(210,218,235),Color3.fromRGB(20,22,27)}
+			{"Terminal",Color3.fromRGB(55,225,118),Color3.fromRGB(6,15,10)},
+			{"Ink",Color3.fromRGB(206,207,220),Color3.fromRGB(13,13,17)},
+			{"Light",Color3.fromRGB(244,190,48),Color3.fromRGB(30,27,20)},
+			{"Snow",Color3.fromRGB(210,218,235),Color3.fromRGB(20,22,27)},
+			{"Matcha",Color3.fromRGB(92,184,88),Color3.fromRGB(11,19,12)},
+			{"Sakura",Color3.fromRGB(242,100,158),Color3.fromRGB(24,11,18)},
+			{"Parchment",Color3.fromRGB(184,133,71),Color3.fromRGB(24,18,12)}
 		}
 		for _,palette in ipairs(palettes) do
 			local option=Instance.new("TextButton"); option.AutoButtonColor=false; option.BackgroundColor3=palette[2]; option.BackgroundTransparency=.86; option.BorderSizePixel=0; option.Size=UDim2.new(1,0,0,30); option.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); option.Text="  "..palette[1]; option.TextColor3=Color3.fromRGB(242,242,245); option.TextSize=11; option.TextXAlignment=Enum.TextXAlignment.Left; option.ZIndex=262; option.Parent=themePopup
@@ -1738,22 +1745,15 @@ function MacLib:Window(Settings)
 		end
 
 		local paletteButton=headerButton("palette",nil,34,function() themePopup.Visible=not themePopup.Visible; playUISound("Dropdown",themePopup.Visible and 1.06 or .96,.14,.03) end,"Theme and accent")
-		local docked=false
-		local expandedSize=base.Size
-		local expandedPosition=base.Position
+		local docked=true
+		local dock
 		local dockToggle
 		function WindowFunctions:SetDockMode(state)
 			docked=state==true
-			content.Visible=not docked
-			if footerFrame then footerFrame.Visible=not docked end
-			if docked then
-				expandedSize=base.Size; expandedPosition=base.Position
-				base.Size=UDim2.fromOffset(math.min(math.max(base.AbsoluteSize.X,620),820),52)
-				base.Position=UDim2.new(.5,0,0,22)
-			else
-				base.Size=expandedSize; base.Position=expandedPosition
-			end
-			playUISound(docked and "Close" or "Open",1,.16,.03)
+			content.Visible=true
+			content.Size=docked and UDim2.new(1,0,1,-94) or UDim2.new(1,0,1,-54)
+			if dock then dock.Visible=docked end
+			playUISound(docked and "Open" or "Close",1,.16,.03)
 		end
 		function WindowFunctions:GetDockMode() return docked end
 		dockToggle=headerButton("panel-top",nil,34,function() WindowFunctions:SetDockMode(not docked) end,"Show dock")
@@ -1764,7 +1764,7 @@ function MacLib:Window(Settings)
 		searchBar.Parent=actions; searchBar.AnchorPoint=Vector2.zero; searchBar.Position=UDim2.new(); searchBar.Size=UDim2.fromOffset(176,32); searchBar.LayoutOrder=-10; searchBar.ZIndex=183
 		searchBarIcon.ZIndex=184; searchInput.ZIndex=184; searchClear.ZIndex=184
 
-		local dock=Instance.new("Frame"); dock.Name="HorizontalDock"; dock.AnchorPoint=Vector2.new(.5,1); dock.Position=UDim2.new(.5,0,1,-24); dock.Size=UDim2.new(1,-18,0,45); dock.BackgroundColor3=Color3.fromRGB(10,10,12); dock.BackgroundTransparency=.08; dock.BorderSizePixel=0; dock.ZIndex=180; dock.Parent=base
+		dock=Instance.new("Frame"); dock.Name="HorizontalDock"; dock.AnchorPoint=Vector2.new(.5,1); dock.Position=UDim2.new(.5,0,1,-24); dock.Size=UDim2.new(1,-18,0,45); dock.BackgroundColor3=Color3.fromRGB(10,10,12); dock.BackgroundTransparency=.08; dock.BorderSizePixel=0; dock.ZIndex=180; dock.Parent=base
 		local dockCorner=Instance.new("UICorner"); dockCorner.CornerRadius=UDim.new(0,9); dockCorner.Parent=dock
 		local dockStroke=Instance.new("UIStroke"); dockStroke.Color=Color3.fromRGB(255,255,255); dockStroke.Transparency=.91; dockStroke.Parent=dock
 		local playerCard=Instance.new("TextButton"); playerCard.Name="PlayerCard"; playerCard.AutoButtonColor=false; playerCard.BackgroundColor3=Color3.fromRGB(255,255,255); playerCard.BackgroundTransparency=.94; playerCard.BorderSizePixel=0; playerCard.Position=UDim2.fromOffset(6,5); playerCard.Size=UDim2.fromOffset(168,35); playerCard.Text=""; playerCard.ZIndex=182; playerCard.Parent=dock
@@ -1789,20 +1789,19 @@ function MacLib:Window(Settings)
 		playerSettingRow("scan-line","Menu Scale","100%",function(value) settingsScale=settingsScale==100 and 110 or (settingsScale==110 and 90 or 100); baseUIScale.Scale=settingsScale/100; value.Text=settingsScale.."%" end,-59)
 		playerSettingRow("languages","Language",Settings.Language or "EN",function(value) value.Text=value.Text=="EN" and "VI" or "EN" end,-58)
 		playerSettingRow("keyboard","Menu Key",tostring((Settings.Keybind or Enum.KeyCode.RightControl).Name):gsub("RightControl","Right Ctrl"),nil,-57)
-		playerSettingRow("panels-top-left","View","Full",function(value) local nextDock=not WindowFunctions:GetDockMode(); WindowFunctions:SetDockMode(nextDock); value.Text=nextDock and "Dock" or "Full" end,-56)
-
-		local activeCount=Instance.new("TextLabel"); activeCount.AnchorPoint=Vector2.new(0,1); activeCount.BackgroundTransparency=1; activeCount.Position=UDim2.new(0,10,0,0); activeCount.Size=UDim2.fromOffset(150,18); activeCount.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); activeCount.Text="◉  "..tostring(Settings.ActiveUsers or "active"); activeCount.TextColor3=accentColor; activeCount.TextSize=9; activeCount.TextXAlignment=Enum.TextXAlignment.Left; activeCount.ZIndex=183; activeCount.Parent=dock
+		playerSettingRow("panels-top-left","View","Dock",function(value) local nextDock=not WindowFunctions:GetDockMode(); WindowFunctions:SetDockMode(nextDock); value.Text=nextDock and "Dock" or "Clean" end,-56)
 
 		local dockScroll=Instance.new("ScrollingFrame"); dockScroll.Name="Tabs"; dockScroll.Position=UDim2.fromOffset(182,4); dockScroll.Size=UDim2.new(1,-188,1,-8); dockScroll.BackgroundTransparency=1; dockScroll.BorderSizePixel=0; dockScroll.ScrollBarThickness=0; dockScroll.AutomaticCanvasSize=Enum.AutomaticSize.X; dockScroll.CanvasSize=UDim2.new(); dockScroll.ScrollingDirection=Enum.ScrollingDirection.X; dockScroll.ZIndex=182; dockScroll.Parent=dock
 		local dockLayout=Instance.new("UIListLayout"); dockLayout.FillDirection=Enum.FillDirection.Horizontal; dockLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; dockLayout.VerticalAlignment=Enum.VerticalAlignment.Center; dockLayout.Padding=UDim.new(0,5); dockLayout.Parent=dockScroll
 		registerSpectrumTab=function(tabFunctions,tabSettings)
-			local b=Instance.new("TextButton"); b.AutoButtonColor=false; b.AutomaticSize=Enum.AutomaticSize.X; b.BackgroundColor3=Color3.fromRGB(255,255,255); b.BackgroundTransparency=.96; b.BorderSizePixel=0; b.Size=UDim2.fromOffset(37,34); b.Text=""; b.ZIndex=184; b.Parent=dockScroll
-			local pad=Instance.new("UIPadding"); pad.PaddingLeft=UDim.new(0,10); pad.PaddingRight=UDim.new(0,10); pad.Parent=b
+			-- Spectrum dock mode is intentionally icon-only. The title is exposed by
+			-- the shared hover tooltip so the bar stays compact even with many tabs.
+			local b=Instance.new("TextButton"); b.AutoButtonColor=false; b.BackgroundColor3=Color3.fromRGB(255,255,255); b.BackgroundTransparency=.96; b.BorderSizePixel=0; b.Size=UDim2.fromOffset(36,34); b.Text=""; b.ZIndex=184; b.Parent=dockScroll
 			local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,7); c.Parent=b
-			local i=Instance.new("ImageLabel"); i.BackgroundTransparency=1; i.Position=UDim2.fromOffset(0,9); i.Size=UDim2.fromOffset(16,16); i.ZIndex=185; i.Parent=b; MacLib:ApplyIcon(i,tabSettings.Icon or tabSettings.Image or "circle",Color3.fromRGB(205,207,213))
-			local t=Instance.new("TextLabel"); t.AutomaticSize=Enum.AutomaticSize.X; t.BackgroundTransparency=1; t.Position=UDim2.fromOffset(22,0); t.Size=UDim2.fromOffset(0,34); t.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); t.Text=tostring(tabSettings.Name or "Tab"); t.TextColor3=Color3.fromRGB(225,227,232); t.TextSize=10; t.ZIndex=185; t.Parent=b
+			local i=Instance.new("ImageLabel"); i.AnchorPoint=Vector2.new(.5,.5); i.BackgroundTransparency=1; i.Position=UDim2.fromScale(.5,.5); i.Size=UDim2.fromOffset(16,16); i.ZIndex=185; i.Parent=b; MacLib:ApplyIcon(i,tabSettings.Icon or tabSettings.Image or "circle",Color3.fromRGB(205,207,213))
 			b.MouseEnter:Connect(function() playUISound("Hover",1.1,.07,.08); Tween(b,TweenInfo.new(.12),{BackgroundTransparency=.89}):Play() end); b.MouseLeave:Connect(function() Tween(b,TweenInfo.new(.12),{BackgroundTransparency=.96}):Play() end)
 			b.MouseButton1Click:Connect(function() tabFunctions:Select(); playUISound("Select",1.04,.14,.03) end)
+			attachTooltip(b,tostring(tabSettings.Title or tabSettings.Name or "Tab"))
 			tabFunctions.DockButton=b
 		end
 
@@ -6066,6 +6065,57 @@ function MacLib:Window(Settings)
 					return GridFunctions
 				end
 
+				-- Rich text + image card used by event trackers, boss lists, changelogs
+				-- and any row where a plain paragraph would be too dense.
+				function SectionFunctions:MediaList(Settings)
+					Settings=Settings or {}
+					local MediaFunctions={Items={}}
+					local list=Instance.new("Frame"); list.Name="MediaList"; list.AutomaticSize=Enum.AutomaticSize.Y; list.BackgroundTransparency=1; list.Size=UDim2.new(1,0,0,0); list.Parent=section
+					local layout=Instance.new("UIListLayout"); layout.Padding=UDim.new(0,7); layout.SortOrder=Enum.SortOrder.LayoutOrder; layout.Parent=list
+					local function createRow(data,index)
+						data=data or {}
+						local color=data.Color or Settings.Color or accentColor
+						local height=tonumber(data.Height or Settings.RowHeight) or 66
+						local row=Instance.new("TextButton"); row.Name="MediaItem"..index; row.AutoButtonColor=false; row.BackgroundColor3=Color3.fromRGB(17,16,18); row.BackgroundTransparency=.26; row.BorderSizePixel=0; row.Size=UDim2.new(1,0,0,height); row.Text=""; row.Parent=list
+						local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,8); corner.Parent=row
+						local stroke=Instance.new("UIStroke"); stroke.Color=color; stroke.Transparency=.84; stroke.Parent=row
+						local imageHolder=Instance.new("Frame"); imageHolder.BackgroundColor3=color; imageHolder.BackgroundTransparency=.86; imageHolder.Position=UDim2.fromOffset(9,9); imageHolder.Size=UDim2.fromOffset(height-18,height-18); imageHolder.Parent=row
+						local ihCorner=Instance.new("UICorner"); ihCorner.CornerRadius=UDim.new(0,8); ihCorner.Parent=imageHolder
+						local image=Instance.new("ImageLabel"); image.BackgroundTransparency=1; image.Position=UDim2.fromOffset(5,5); image.Size=UDim2.new(1,-10,1,-10); image.ScaleType=Enum.ScaleType.Fit; image.Parent=imageHolder
+						MacLib:ApplyIcon(image,data.Image or data.Icon or "image",data.ImageColor or Color3.fromRGB(245,245,245))
+						local left=height+2
+						local title=Instance.new("TextLabel"); title.BackgroundTransparency=1; title.Position=UDim2.fromOffset(left,8); title.Size=UDim2.new(1,-left-86,0,20); title.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); title.Text=tostring(data.Title or data.Name or "Item"); title.TextColor3=Color3.fromRGB(246,246,248); title.TextSize=12; title.TextTruncate=Enum.TextTruncate.AtEnd; title.TextXAlignment=Enum.TextXAlignment.Left; title.Parent=row
+						local description=Instance.new("TextLabel"); description.BackgroundTransparency=1; description.Position=UDim2.fromOffset(left,29); description.Size=UDim2.new(1,-left-12,0,height-35); description.FontFace=Font.new(assets.interFont); description.Text=tostring(data.Description or data.Subtitle or ""); description.TextColor3=Color3.fromRGB(255,255,255); description.TextTransparency=.50; description.TextSize=10; description.TextWrapped=true; description.TextTruncate=Enum.TextTruncate.AtEnd; description.TextXAlignment=Enum.TextXAlignment.Left; description.TextYAlignment=Enum.TextYAlignment.Top; description.Parent=row
+						local badge=Instance.new("TextLabel"); badge.AnchorPoint=Vector2.new(1,0); badge.AutomaticSize=Enum.AutomaticSize.X; badge.BackgroundColor3=color; badge.BackgroundTransparency=.84; badge.Position=UDim2.new(1,-9,0,9); badge.Size=UDim2.fromOffset(0,19); badge.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); badge.Text=tostring(data.Badge or data.Status or ""); badge.TextColor3=color; badge.TextSize=9; badge.Visible=badge.Text~=""; badge.Parent=row
+						local bp=Instance.new("UIPadding"); bp.PaddingLeft=UDim.new(0,7); bp.PaddingRight=UDim.new(0,7); bp.Parent=badge
+						local bc=Instance.new("UICorner"); bc.CornerRadius=UDim.new(1,0); bc.Parent=badge
+						row.MouseEnter:Connect(function() playUISound("Hover",1.1,.06,.08); Tween(row,TweenInfo.new(.14),{BackgroundTransparency=.14}):Play(); Tween(stroke,TweenInfo.new(.14),{Transparency=.55}):Play() end)
+						row.MouseLeave:Connect(function() Tween(row,TweenInfo.new(.14),{BackgroundTransparency=.26}):Play(); Tween(stroke,TweenInfo.new(.14),{Transparency=.84}):Play() end)
+						row.MouseButton1Click:Connect(function() playUISound("Click",1.04,.15,.03); if data.Callback then task.spawn(data.Callback,index,data) end end)
+						if data.Tooltip then attachTooltip(row,data.Tooltip) end
+						local item={Instance=row,Image=image,ImageHolder=imageHolder,Title=title,Description=description,Badge=badge,Stroke=stroke}
+						MediaFunctions.Items[index]=item
+						return item
+					end
+					for index,data in ipairs(Settings.Items or Settings.Values or {}) do createRow(data,index) end
+					function MediaFunctions:Add(data) return createRow(data,#MediaFunctions.Items+1) end
+					function MediaFunctions:SetItem(index,data)
+						local item=MediaFunctions.Items[index]; if not item or not data then return end
+						if data.Title then item.Title.Text=tostring(data.Title) end
+						if data.Description or data.Subtitle then item.Description.Text=tostring(data.Description or data.Subtitle) end
+						if data.Badge or data.Status then item.Badge.Text=tostring(data.Badge or data.Status); item.Badge.Visible=item.Badge.Text~="" end
+						if data.Image or data.Icon then MacLib:ApplyIcon(item.Image,data.Image or data.Icon,data.ImageColor or Color3.fromRGB(245,245,245)) end
+					end
+					function MediaFunctions:SetVisibility(v) list.Visible=v==true end
+					return MediaFunctions
+				end
+
+				SectionFunctions.TrackerList=SectionFunctions.MediaList
+				SectionFunctions.CollectionGrid=SectionFunctions.ImageGrid
+				SectionFunctions.AddMediaList=SectionFunctions.MediaList
+				SectionFunctions.AddTrackerList=SectionFunctions.MediaList
+				SectionFunctions.AddCollectionGrid=SectionFunctions.ImageGrid
+
 				function SectionFunctions:ButtonRow(Settings)
 					Settings = Settings or {}
 					local RowFunctions = { Buttons = {} }
@@ -8371,6 +8421,64 @@ function MacLib:Window(Settings)
 	WindowFunctions.LockWindow = WindowFunctions.Lock
 	WindowFunctions.UnlockWindow = WindowFunctions.Unlock
 
+	-- Optional cinematic startup. It is intentionally self-contained and uses
+	-- lightweight UI shards instead of a video, so it works on mobile executors.
+	local introRunning=false
+	function WindowFunctions:PlayIntro(options)
+		if introRunning then return end
+		options=type(options)=="table" and options or {}
+		introRunning=true
+		base.Visible=false
+		local duration=math.clamp(tonumber(options.Duration or Settings.IntroDuration) or 2.8,1.2,8)
+		local overlay=Instance.new("Frame"); overlay.Name="CinematicIntro"; overlay.BackgroundColor3=options.BackgroundColor or Color3.fromRGB(3,4,8); overlay.BackgroundTransparency=tonumber(options.BackgroundTransparency) or .08; overlay.BorderSizePixel=0; overlay.Size=UDim2.fromScale(1,1); overlay.ZIndex=1200; overlay.Parent=macLib
+		local shade=Instance.new("UIGradient"); shade.Rotation=90; shade.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(4,5,10)),ColorSequenceKeypoint.new(.52,Color3.fromRGB(10,8,18)),ColorSequenceKeypoint.new(1,Color3.fromRGB(1,2,5))}); shade.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.05),NumberSequenceKeypoint.new(.5,.32),NumberSequenceKeypoint.new(1,.05)}); shade.Parent=overlay
+
+		local glow=Instance.new("Frame"); glow.AnchorPoint=Vector2.new(.5,.5); glow.Position=UDim2.fromScale(.5,.43); glow.Size=UDim2.fromOffset(280,280); glow.BackgroundColor3=options.Accent or accentColor; glow.BackgroundTransparency=.86; glow.BorderSizePixel=0; glow.ZIndex=1201; glow.Parent=overlay
+		local glowCorner=Instance.new("UICorner"); glowCorner.CornerRadius=UDim.new(1,0); glowCorner.Parent=glow
+		local glowGradient=Instance.new("UIGradient"); glowGradient.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.45),NumberSequenceKeypoint.new(1,1)}); glowGradient.Rotation=90; glowGradient.Parent=glow
+
+		local logo=Instance.new("ImageLabel"); logo.AnchorPoint=Vector2.new(.5,.5); logo.BackgroundTransparency=1; logo.Position=UDim2.fromScale(.5,.40); logo.Size=UDim2.fromOffset(0,0); logo.ScaleType=Enum.ScaleType.Fit; logo.ImageTransparency=1; logo.ZIndex=1210; logo.Parent=overlay
+		MacLib:ApplyIcon(logo,options.Logo or Settings.IntroLogo or Settings.Icon or "sparkles",options.LogoColor or Color3.fromRGB(235,225,255))
+
+		local title=Instance.new("TextLabel"); title.AnchorPoint=Vector2.new(.5,0); title.BackgroundTransparency=1; title.Position=UDim2.fromScale(.5,.57); title.Size=UDim2.new(.86,0,0,34); title.FontFace=Font.new(assets.interFont,Enum.FontWeight.Bold); title.Text=tostring(options.Title or Settings.IntroTitle or Settings.Brand or Settings.Title or "NNVN HUB"); title.TextColor3=options.TextColor or Color3.fromRGB(245,245,248); title.TextSize=tonumber(options.TitleSize) or 25; title.TextTransparency=1; title.TextXAlignment=Enum.TextXAlignment.Center; title.ZIndex=1210; title.Parent=overlay
+		local spacing=Instance.new("UIStroke"); spacing.Color=options.Accent or accentColor; spacing.Transparency=.72; spacing.Thickness=1; spacing.Parent=title
+		local subtitle=Instance.new("TextLabel"); subtitle.AnchorPoint=Vector2.new(.5,0); subtitle.BackgroundTransparency=1; subtitle.Position=UDim2.fromScale(.5,.63); subtitle.Size=UDim2.new(.9,0,0,21); subtitle.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); subtitle.Text=tostring(options.Subtitle or Settings.IntroSubtitle or "PREMIUM AUTOMATION INTERFACE"); subtitle.TextColor3=Color3.fromRGB(255,255,255); subtitle.TextSize=10; subtitle.TextTransparency=1; subtitle.TextXAlignment=Enum.TextXAlignment.Center; subtitle.ZIndex=1210; subtitle.Parent=overlay
+		local welcome=Instance.new("TextLabel"); welcome.AnchorPoint=Vector2.new(.5,0); welcome.BackgroundTransparency=1; welcome.Position=UDim2.fromScale(.5,.69); welcome.Size=UDim2.new(.9,0,0,19); welcome.FontFace=Font.new(assets.interFont); welcome.Text=tostring(options.Welcome or ("Welcome, "..(Settings.Anonymous and (Settings.AnonymousName or "Anonymous") or LocalPlayer.DisplayName))); welcome.TextColor3=options.Accent or accentColor; welcome.TextSize=10; welcome.TextTransparency=1; welcome.TextXAlignment=Enum.TextXAlignment.Center; welcome.ZIndex=1210; welcome.Parent=overlay
+
+		-- Procedural glass cracks radiating from the logo. These are decorative and
+		-- avoid a mandatory external texture; CrackImage may still override them.
+		local crackHolder=Instance.new("Frame"); crackHolder.AnchorPoint=Vector2.new(.5,.5); crackHolder.BackgroundTransparency=1; crackHolder.Position=UDim2.fromScale(.5,.43); crackHolder.Size=UDim2.fromOffset(1,1); crackHolder.ZIndex=1206; crackHolder.Parent=overlay
+		for index=1,18 do
+			local length=math.random(70,260)
+			local line=Instance.new("Frame"); line.AnchorPoint=Vector2.new(0,.5); line.BackgroundColor3=index%3==0 and (options.Accent or accentColor) or Color3.fromRGB(225,226,245); line.BackgroundTransparency=1; line.BorderSizePixel=0; line.Position=UDim2.fromOffset(math.random(-8,8),math.random(-8,8)); line.Rotation=(index-1)*(360/18)+math.random(-8,8); line.Size=UDim2.fromOffset(0,index%4==0 and 2 or 1); line.ZIndex=1206; line.Parent=crackHolder
+			task.delay(.35+index*.012,function() if line.Parent then Tween(line,TweenInfo.new(.28,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=UDim2.fromOffset(length,line.Size.Y.Offset),BackgroundTransparency=.54}):Play() end end)
+		end
+		if options.CrackImage or Settings.IntroCrackImage then
+			local crack=Instance.new("ImageLabel"); crack.BackgroundTransparency=1; crack.Size=UDim2.fromScale(1,1); crack.ScaleType=Enum.ScaleType.Stretch; crack.Image=tostring(options.CrackImage or Settings.IntroCrackImage); crack.ImageTransparency=1; crack.ZIndex=1205; crack.Parent=overlay
+			Tween(crack,TweenInfo.new(.35),{ImageTransparency=.36}):Play()
+		end
+		for index=1,24 do
+			local shard=Instance.new("Frame"); shard.AnchorPoint=Vector2.new(.5,.5); shard.BackgroundColor3=index%2==0 and (options.Accent or accentColor) or Color3.fromRGB(235,235,245); shard.BackgroundTransparency=.22; shard.BorderSizePixel=0; shard.Position=UDim2.fromScale(.5,.43); shard.Rotation=math.random(0,180); shard.Size=UDim2.fromOffset(math.random(2,5),math.random(7,18)); shard.ZIndex=1207; shard.Parent=overlay
+			local target=UDim2.new(.5,math.random(-330,330),.43,math.random(-210,240)); task.delay(.28+math.random()*0.18,function() if shard.Parent then Tween(shard,TweenInfo.new(.72,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{Position=target,Rotation=shard.Rotation+math.random(90,260),BackgroundTransparency=1}):Play() end end)
+		end
+
+		playUISound("Open",.9,.22,0)
+		Tween(logo,TweenInfo.new(.55,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.fromOffset(132,132),ImageTransparency=0}):Play()
+		task.delay(.35,function()
+			Tween(title,TweenInfo.new(.34),{TextTransparency=0}):Play(); Tween(subtitle,TweenInfo.new(.34),{TextTransparency=.28}):Play(); Tween(welcome,TweenInfo.new(.34),{TextTransparency=.12}):Play()
+		end)
+		task.delay(duration,function()
+			if not overlay.Parent then introRunning=false return end
+			playUISound("Select",1.08,.17,0)
+			Tween(overlay,TweenInfo.new(.42,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{BackgroundTransparency=1}):Play()
+			for _,object in ipairs(overlay:GetDescendants()) do
+				if object:IsA("TextLabel") then Tween(object,TweenInfo.new(.28),{TextTransparency=1}):Play() elseif object:IsA("ImageLabel") then Tween(object,TweenInfo.new(.28),{ImageTransparency=1}):Play() elseif object:IsA("Frame") then Tween(object,TweenInfo.new(.28),{BackgroundTransparency=1}):Play() end
+			end
+			task.delay(.44,function() if overlay then overlay:Destroy() end; introRunning=false; playWindowOpen() end)
+		end)
+		return overlay
+	end
+
 	macLib.Enabled = false
 	
 	local assetList = {}
@@ -8387,7 +8495,7 @@ function MacLib:Window(Settings)
 	macLib.Enabled = true
 	windowState = true
 	if openButtonContainer then openButtonContainer.Visible = false end
-	playWindowOpen()
+	if Settings.Intro then WindowFunctions:PlayIntro(Settings.Intro) else playWindowOpen() end
 
 	return WindowFunctions
 end
@@ -9426,6 +9534,12 @@ do
 			MaxSize = settings.MaxSize,
 			ConfirmClose = settings.ConfirmClose,
 			Animations = settings.Animations,
+			Intro = settings.Intro,
+			IntroLogo = settings.IntroLogo,
+			IntroTitle = settings.IntroTitle,
+			IntroSubtitle = settings.IntroSubtitle,
+			IntroDuration = settings.IntroDuration,
+			IntroCrackImage = settings.IntroCrackImage,
 			Sounds = settings.Sounds,
 			SoundIds = settings.SoundIds,
 			NativeSettings = settings.NativeSettings,
