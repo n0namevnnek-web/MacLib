@@ -43,6 +43,37 @@ local assets = {
 MacLib.Icons = {}
 MacLib.IconProvider = nil
 MacLib.LucideSource = "https://raw.githubusercontent.com/deividcomsono/lucide-roblox-direct/refs/heads/main/source.lua"
+MacLib.UISounds = {
+	Enabled = true,
+	Volume = 0.16,
+	Click = "rbxassetid://6895079853",
+	Open = "rbxassetid://6895079853",
+	Select = "rbxassetid://6895079853",
+}
+
+function MacLib:SetUISounds(settings)
+	if type(settings) ~= "table" then return end
+	for key, value in pairs(settings) do
+		if self.UISounds[key] ~= nil then self.UISounds[key] = value end
+	end
+end
+
+function MacLib:PlayUISound(kind)
+	local settings = self.UISounds
+	if not settings.Enabled then return end
+	local soundId = settings[kind or "Click"] or settings.Click
+	if not soundId or soundId == "" then return end
+	task.spawn(function()
+		local sound = Instance.new("Sound")
+		sound.Name = "MacLibUI" .. tostring(kind or "Click")
+		sound.SoundId = tostring(soundId):match("^rbxassetid://") and tostring(soundId) or ("rbxassetid://" .. tostring(soundId))
+		sound.Volume = tonumber(settings.Volume) or 0.16
+		sound.Parent = SoundService
+		sound.Ended:Once(function() sound:Destroy() end)
+		sound:Play()
+		task.delay(3, function() if sound.Parent then sound:Destroy() end end)
+	end)
+end
 
 function MacLib:SetIconProvider(provider)
 	self.IconProvider = provider
@@ -114,45 +145,13 @@ end
 function MacLib:Window(Settings)
 	local WindowFunctions = {}
 	WindowFunctions.Settings = Settings
-	local soundsEnabled = Settings.Sounds ~= false
-	local soundIds = Settings.SoundIds or {
-		Click = "rbxassetid://6895079853",
-		Tick = "rbxassetid://6895079853",
-		Open = "rbxassetid://9118826049",
-		Close = "rbxassetid://9118826049",
-		Hover = "rbxassetid://6895079853",
-		Dropdown = "rbxassetid://12221967",
-		Select = "rbxassetid://6895079853",
-		Toggle = "rbxassetid://6895079853"
-	}
-	local lastSoundAt = {}
-	local function playUISound(kind, speed, volume, throttle)
-		if not soundsEnabled then return end
-		local now = os.clock()
-		if throttle and now - (lastSoundAt[kind] or 0) < throttle then return end
-		lastSoundAt[kind] = now
-		local id = soundIds[kind] or soundIds.Click
-		if not id or id == "" then return end
-		local sound = Instance.new("Sound")
-		sound.Name = "MacLib" .. tostring(kind) .. "Sound"
-		sound.SoundId = tostring(id):match("^rbxassetid://") and tostring(id) or ("rbxassetid://" .. tostring(id))
-		sound.PlaybackSpeed = tonumber(speed) or 1
-		sound.Volume = tonumber(volume) or 0.22
-		sound.Parent = SoundService
-		SoundService:PlayLocalSound(sound)
-		task.delay(3, function() if sound then sound:Destroy() end end)
-	end
-	function WindowFunctions:SetSoundsEnabled(state) soundsEnabled = state == true end
-	function WindowFunctions:GetSoundsEnabled() return soundsEnabled end
-	function WindowFunctions:PlaySound(kind, speed, volume) playUISound(kind or "Click", speed, volume) end
 	local searchRegistry = {}
 	local windowTabs = {}
 	local tabSwitcherButtons = {}
-	local spectrumMode = Settings.Layout == "Horizontal" or Settings.Layout == "Spectrum"
-	local registerSpectrumTab
 	local autoSelectTabs = Settings.AutoSelect ~= false
 	local animationsEnabled = Settings.Animations ~= false
 	local confirmCloseEnabled = Settings.ConfirmClose ~= false
+	if type(Settings.Sounds) == "table" then MacLib:SetUISounds(Settings.Sounds) end
 	currentTabInstance = nil
 	tabIndex = 0
 
@@ -897,47 +896,6 @@ function MacLib:Window(Settings)
 		WindowFunctions:Tag(tagSettings)
 	end
 
-	-- Optional floating mascot/pet. It stays outside the window, gently bobs,
-	-- supports any rbxassetid/rbxthumb image and can be dragged by the user.
-	function WindowFunctions:AddMascot(MascotSettings)
-		MascotSettings = MascotSettings or {}
-		local MascotFunctions = {}
-		local mascot = Instance.new("ImageButton")
-		mascot.Name = "MacLibMascot"
-		mascot.AutoButtonColor = false
-		mascot.BackgroundTransparency = 1
-		mascot.AnchorPoint = Vector2.new(.5,.5)
-		mascot.Position = MascotSettings.Position or UDim2.new(1,-72,1,-84)
-		local size = tonumber(MascotSettings.Size) or 58
-		mascot.Size = UDim2.fromOffset(size,size)
-		mascot.ScaleType = Enum.ScaleType.Fit
-		mascot.Parent = macLib
-		MacLib:ApplyIcon(mascot,MascotSettings.Image or MascotSettings.Icon or "sparkles",MascotSettings.Color or Color3.fromRGB(255,255,255))
-		local scale=Instance.new("UIScale"); scale.Parent=mascot
-		local shadow=Instance.new("ImageLabel"); shadow.Name="Shadow"; shadow.AnchorPoint=Vector2.new(.5,.5); shadow.BackgroundTransparency=1; shadow.Position=UDim2.new(.5,0,1,8); shadow.Size=UDim2.new(.8,0,0,10); shadow.Image="rbxassetid://1316045217"; shadow.ImageColor3=Color3.new(0,0,0); shadow.ImageTransparency=.62; shadow.ZIndex=mascot.ZIndex-1; shadow.Parent=mascot
-		local bob=Tween(mascot,TweenInfo.new(1.35,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{Position=mascot.Position+UDim2.fromOffset(0,-7)})
-		if MascotSettings.Bobbing~=false then bob:Play() end
-		mascot.MouseEnter:Connect(function() Tween(scale,TweenInfo.new(.15,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Scale=1.08}):Play() end)
-		mascot.MouseLeave:Connect(function() Tween(scale,TweenInfo.new(.15,Enum.EasingStyle.Sine),{Scale=1}):Play() end)
-		mascot.MouseButton1Click:Connect(function() playUISound("Click",1.12,.17,.04); if MascotSettings.Callback then task.spawn(MascotSettings.Callback,MascotFunctions) end end)
-		local draggingMascot,dragStart,startPosition
-		mascot.InputBegan:Connect(function(input)
-			if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then draggingMascot=true; dragStart=input.Position; startPosition=mascot.Position end
-		end)
-		mascot.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then draggingMascot=false end end)
-		UserInputService.InputChanged:Connect(function(input)
-			if draggingMascot and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
-				local delta=input.Position-dragStart; mascot.Position=startPosition+UDim2.fromOffset(delta.X,delta.Y)
-			end
-		end)
-		function MascotFunctions:SetImage(v,c) return MacLib:ApplyIcon(mascot,v,c or Color3.fromRGB(255,255,255)) end
-		function MascotFunctions:SetVisible(v) mascot.Visible=v==true end
-		function MascotFunctions:SetPosition(v) mascot.Position=v end
-		function MascotFunctions:Destroy() bob:Cancel(); mascot:Destroy() end
-		MascotFunctions.Instance=mascot
-		return MascotFunctions
-	end
-
 	local userInfoUIPadding = Instance.new("UIPadding")
 	userInfoUIPadding.Name = "UserInfoUIPadding"
 	userInfoUIPadding.PaddingLeft = UDim.new(0, 10)
@@ -1668,176 +1626,6 @@ function MacLib:Window(Settings)
 			toggle()
 		end
 	end)
-
-	-- Horizontal/Spectrum layout. This is an original MacLib layout which keeps
-	-- the existing tab/control API intact while presenting navigation as a dock.
-	if spectrumMode then
-		if not Settings.Size then base.Size = UDim2.fromOffset(900, 560) end
-		sidebar.Visible = false
-		windowControls.Visible = false
-		globalSettings.AnchorPoint = Vector2.new(0, 1)
-		globalSettings.Position = UDim2.new(0, 12, 1, -74)
-		globalSettings.BackgroundColor3 = Color3.fromRGB(15, 13, 15)
-		globalSettings.BackgroundTransparency = .08
-		content.AnchorPoint = Vector2.new(0, 0)
-		content.Position = UDim2.fromOffset(0, 52)
-		content.Size = UDim2.new(1, 0, 1, -94)
-
-		local header = Instance.new("Frame")
-		header.Name = "HorizontalHeader"
-		header.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
-		header.BackgroundTransparency = .08
-		header.BorderSizePixel = 0
-		header.Size = UDim2.new(1, 0, 0, 52)
-		header.ZIndex = 180
-		header.Parent = base
-		local headerCorner = Instance.new("UICorner"); headerCorner.CornerRadius = UDim.new(0, 8); headerCorner.Parent = header
-		local headerStroke = Instance.new("UIStroke"); headerStroke.Color = Color3.fromRGB(255,255,255); headerStroke.Transparency = .90; headerStroke.Parent = header
-
-		local brand = Instance.new("TextLabel")
-		brand.Name = "Brand"; brand.BackgroundTransparency = 1; brand.Position = UDim2.fromOffset(18, 5); brand.Size = UDim2.fromOffset(205, 26)
-		brand.FontFace = Font.new(assets.interFont, Enum.FontWeight.Bold, Enum.FontStyle.Normal); brand.Text = tostring(Settings.Brand or Settings.Title or "MacLib")
-		brand.TextColor3 = Color3.fromRGB(248,248,250); brand.TextSize = 20; brand.TextXAlignment = Enum.TextXAlignment.Left; brand.ZIndex=182; brand.Parent=header
-		local brandSub = Instance.new("TextLabel")
-		brandSub.BackgroundTransparency=1; brandSub.Position=UDim2.fromOffset(19,29); brandSub.Size=UDim2.fromOffset(205,15); brandSub.FontFace=Font.new(assets.interFont)
-		brandSub.Text=tostring(Settings.Version or Settings.Subtitle or "Modern interface"); brandSub.TextColor3=Color3.fromRGB(255,255,255); brandSub.TextTransparency=.58; brandSub.TextSize=9; brandSub.TextXAlignment=Enum.TextXAlignment.Left; brandSub.ZIndex=182; brandSub.Parent=header
-
-		local actions=Instance.new("Frame"); actions.Name="HeaderActions"; actions.AnchorPoint=Vector2.new(1,.5); actions.Position=UDim2.new(1,-9,.5,0); actions.Size=UDim2.fromOffset(520,36); actions.BackgroundTransparency=1; actions.ZIndex=182; actions.Parent=header
-		local actionLayout=Instance.new("UIListLayout"); actionLayout.FillDirection=Enum.FillDirection.Horizontal; actionLayout.HorizontalAlignment=Enum.HorizontalAlignment.Right; actionLayout.VerticalAlignment=Enum.VerticalAlignment.Center; actionLayout.Padding=UDim.new(0,6); actionLayout.Parent=actions
-
-		local function headerButton(iconValue, textValue, width, callback, tooltipText)
-			local button=Instance.new("TextButton"); button.AutoButtonColor=false; button.BackgroundColor3=Color3.fromRGB(255,255,255); button.BackgroundTransparency=.94; button.BorderSizePixel=0; button.Size=UDim2.fromOffset(width or 34,32); button.Text=""; button.ZIndex=183; button.Parent=actions
-			local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,7); corner.Parent=button
-			local stroke=Instance.new("UIStroke"); stroke.Color=Color3.fromRGB(255,255,255); stroke.Transparency=.90; stroke.Parent=button
-			local icon=Instance.new("ImageLabel"); icon.BackgroundTransparency=1; icon.Position=UDim2.fromOffset(9,8); icon.Size=UDim2.fromOffset(16,16); icon.ZIndex=184; icon.Parent=button; MacLib:ApplyIcon(icon,iconValue or "circle",Color3.fromRGB(220,222,228))
-			if textValue then local label=Instance.new("TextLabel"); label.BackgroundTransparency=1; label.Position=UDim2.fromOffset(31,0); label.Size=UDim2.new(1,-37,1,0); label.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium,Enum.FontStyle.Normal); label.Text=tostring(textValue); label.TextColor3=Color3.fromRGB(225,227,232); label.TextSize=10; label.TextTruncate=Enum.TextTruncate.AtEnd; label.TextXAlignment=Enum.TextXAlignment.Left; label.ZIndex=184; label.Parent=button end
-			button.MouseEnter:Connect(function() playUISound("Hover",1.12,.08,.08); Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.88}):Play() end)
-			button.MouseLeave:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.94}):Play() end)
-			button.MouseButton1Click:Connect(function() playUISound("Click",1.04,.16,.04); if callback then callback(button) end end)
-			attachTooltip(button,tooltipText)
-			return button
-		end
-
-		local gameButton=headerButton(Settings.GameIcon or "gamepad-2",Settings.GameName or Settings.Game or "Game",118,nil,"Current game")
-		local languageButton=headerButton("languages",Settings.Language or "EN",58,nil,"Language")
-		local themePopup=Instance.new("Frame"); themePopup.Name="ThemePopup"; themePopup.AnchorPoint=Vector2.new(1,0); themePopup.Position=UDim2.new(1,-48,0,46); themePopup.Size=UDim2.fromOffset(152,0); themePopup.AutomaticSize=Enum.AutomaticSize.Y; themePopup.BackgroundColor3=Color3.fromRGB(18,16,18); themePopup.BackgroundTransparency=.06; themePopup.BorderSizePixel=0; themePopup.Visible=false; themePopup.ZIndex=260; themePopup.Parent=header
-		local themeCorner=Instance.new("UICorner"); themeCorner.CornerRadius=UDim.new(0,9); themeCorner.Parent=themePopup
-		local themeStroke=Instance.new("UIStroke"); themeStroke.Color=accentColor; themeStroke.Transparency=.60; themeStroke.Parent=themePopup
-		local themeLayout=Instance.new("UIListLayout"); themeLayout.Padding=UDim.new(0,3); themeLayout.Parent=themePopup
-		local themePadding=Instance.new("UIPadding"); themePadding.PaddingTop=UDim.new(0,6); themePadding.PaddingBottom=UDim.new(0,6); themePadding.PaddingLeft=UDim.new(0,6); themePadding.PaddingRight=UDim.new(0,6); themePadding.Parent=themePopup
-		local palettes={
-			{"Spectrum",Color3.fromRGB(176,105,255),Color3.fromRGB(11,9,17)},
-			{"Midnight",Color3.fromRGB(65,120,210),Color3.fromRGB(10,13,20)},
-			{"Ember",Color3.fromRGB(255,119,32),Color3.fromRGB(18,12,10)},
-			{"Abyss",Color3.fromRGB(38,185,196),Color3.fromRGB(8,15,17)},
-			{"Terminal",Color3.fromRGB(55,225,118),Color3.fromRGB(6,15,10)},
-			{"Ink",Color3.fromRGB(206,207,220),Color3.fromRGB(13,13,17)},
-			{"Light",Color3.fromRGB(244,190,48),Color3.fromRGB(30,27,20)},
-			{"Snow",Color3.fromRGB(210,218,235),Color3.fromRGB(20,22,27)},
-			{"Matcha",Color3.fromRGB(92,184,88),Color3.fromRGB(11,19,12)},
-			{"Sakura",Color3.fromRGB(242,100,158),Color3.fromRGB(24,11,18)},
-			{"Parchment",Color3.fromRGB(184,133,71),Color3.fromRGB(24,18,12)}
-		}
-		for _,palette in ipairs(palettes) do
-			local option=Instance.new("TextButton"); option.AutoButtonColor=false; option.BackgroundColor3=palette[2]; option.BackgroundTransparency=.86; option.BorderSizePixel=0; option.Size=UDim2.new(1,0,0,30); option.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); option.Text="  "..palette[1]; option.TextColor3=Color3.fromRGB(242,242,245); option.TextSize=11; option.TextXAlignment=Enum.TextXAlignment.Left; option.ZIndex=262; option.Parent=themePopup
-			local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,6); c.Parent=option
-			option.MouseButton1Click:Connect(function() base.BackgroundColor3=palette[3]; header.BackgroundColor3=palette[3]; WindowFunctions:SetAccent(palette[2]); themeStroke.Color=palette[2]; themePopup.Visible=false; playUISound("Select",1.08,.15,.03) end)
-		end
-
-		local paletteButton=headerButton("palette",nil,34,function() themePopup.Visible=not themePopup.Visible; playUISound("Dropdown",themePopup.Visible and 1.06 or .96,.14,.03) end,"Theme and accent")
-		local docked=true
-		local dock
-		local dockToggle
-		function WindowFunctions:SetDockMode(state)
-			docked=state==true
-			content.Visible=true
-			content.Size=docked and UDim2.new(1,0,1,-94) or UDim2.new(1,0,1,-54)
-			if dock then dock.Visible=docked end
-			playUISound(docked and "Open" or "Close",1,.16,.03)
-		end
-		function WindowFunctions:GetDockMode() return docked end
-		dockToggle=headerButton("panel-top",nil,34,function() WindowFunctions:SetDockMode(not docked) end,"Show dock")
-		headerButton("minus",nil,34,function() WindowFunctions:SetState(false) end,"Hide menu")
-		headerButton("maximize-2",nil,34,function() if base.Size.X.Offset<1000 then base.Size=UDim2.fromOffset(1080,680) else base.Size=Settings.Size or UDim2.fromOffset(900,560) end end,"Resize menu")
-
-		-- Reuse the fully functional native search box in the horizontal header.
-		searchBar.Parent=actions; searchBar.AnchorPoint=Vector2.zero; searchBar.Position=UDim2.new(); searchBar.Size=UDim2.fromOffset(176,32); searchBar.LayoutOrder=-10; searchBar.ZIndex=183
-		searchBarIcon.ZIndex=184; searchInput.ZIndex=184; searchClear.ZIndex=184
-
-		dock=Instance.new("Frame"); dock.Name="HorizontalDock"; dock.AnchorPoint=Vector2.new(.5,1); dock.Position=UDim2.new(.5,0,1,-24); dock.Size=UDim2.new(1,-18,0,45); dock.BackgroundColor3=Color3.fromRGB(10,10,12); dock.BackgroundTransparency=.08; dock.BorderSizePixel=0; dock.ZIndex=180; dock.Parent=base
-		local dockCorner=Instance.new("UICorner"); dockCorner.CornerRadius=UDim.new(0,9); dockCorner.Parent=dock
-		local dockStroke=Instance.new("UIStroke"); dockStroke.Color=Color3.fromRGB(255,255,255); dockStroke.Transparency=.91; dockStroke.Parent=dock
-		local playerCard=Instance.new("TextButton"); playerCard.Name="PlayerCard"; playerCard.AutoButtonColor=false; playerCard.BackgroundColor3=Color3.fromRGB(255,255,255); playerCard.BackgroundTransparency=.94; playerCard.BorderSizePixel=0; playerCard.Position=UDim2.fromOffset(6,5); playerCard.Size=UDim2.fromOffset(168,35); playerCard.Text=""; playerCard.ZIndex=182; playerCard.Parent=dock
-		local pcCorner=Instance.new("UICorner"); pcCorner.CornerRadius=UDim.new(0,8); pcCorner.Parent=playerCard
-		local avatar=Instance.new("ImageLabel"); avatar.BackgroundTransparency=1; avatar.Position=UDim2.fromOffset(5,4); avatar.Size=UDim2.fromOffset(27,27); avatar.Image=headshotImage; avatar.ZIndex=183; avatar.Parent=playerCard; local avCorner=Instance.new("UICorner"); avCorner.CornerRadius=UDim.new(1,0); avCorner.Parent=avatar
-		local playerName=Instance.new("TextLabel"); playerName.BackgroundTransparency=1; playerName.Position=UDim2.fromOffset(39,3); playerName.Size=UDim2.new(1,-45,0,16); playerName.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); playerName.Text=Settings.Anonymous and (Settings.AnonymousName or "Anonymous") or LocalPlayer.DisplayName; playerName.TextColor3=Color3.fromRGB(244,244,246); playerName.TextSize=11; playerName.TextTruncate=Enum.TextTruncate.AtEnd; playerName.TextXAlignment=Enum.TextXAlignment.Left; playerName.ZIndex=183; playerName.Parent=playerCard
-		local playerTier=Instance.new("TextLabel"); playerTier.BackgroundTransparency=1; playerTier.Position=UDim2.fromOffset(39,18); playerTier.Size=UDim2.new(1,-45,0,13); playerTier.FontFace=Font.new(assets.interFont); playerTier.Text=tostring(Settings.UserTier or Settings.Tier or "Free Users"); playerTier.TextColor3=Color3.fromRGB(255,255,255); playerTier.TextTransparency=.58; playerTier.TextSize=9; playerTier.TextXAlignment=Enum.TextXAlignment.Left; playerTier.ZIndex=183; playerTier.Parent=playerCard
-		playerCard.MouseButton1Click:Connect(function() playUISound("Open",1.05,.15,.03); toggle() end)
-
-		local settingsScale=100
-		local function playerSettingRow(iconValue,labelText,valueText,callback,order)
-			local row=Instance.new("TextButton"); row.Name="PlayerSetting"; row.AutoButtonColor=false; row.BackgroundColor3=Color3.fromRGB(255,255,255); row.BackgroundTransparency=.95; row.BorderSizePixel=0; row.LayoutOrder=order or -20; row.Size=UDim2.fromOffset(220,34); row.Text=""; row.Parent=globalSettings
-			local rc=Instance.new("UICorner"); rc.CornerRadius=UDim.new(0,7); rc.Parent=row
-			local ri=Instance.new("ImageLabel"); ri.BackgroundTransparency=1; ri.Position=UDim2.fromOffset(9,9); ri.Size=UDim2.fromOffset(15,15); ri.Parent=row; MacLib:ApplyIcon(ri,iconValue,Color3.fromRGB(210,212,218))
-			local rn=Instance.new("TextLabel"); rn.BackgroundTransparency=1; rn.Position=UDim2.fromOffset(32,0); rn.Size=UDim2.new(1,-94,1,0); rn.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); rn.Text=tostring(labelText); rn.TextColor3=Color3.fromRGB(230,232,236); rn.TextSize=11; rn.TextXAlignment=Enum.TextXAlignment.Left; rn.Parent=row
-			local rv=Instance.new("TextLabel"); rv.AnchorPoint=Vector2.new(1,0); rv.BackgroundTransparency=1; rv.Position=UDim2.new(1,-10,0,0); rv.Size=UDim2.fromOffset(75,34); rv.FontFace=Font.new(assets.interFont); rv.Text=tostring(valueText or ""); rv.TextColor3=accentColor; rv.TextSize=10; rv.TextXAlignment=Enum.TextXAlignment.Right; rv.Parent=row
-			row.MouseEnter:Connect(function() playUISound("Hover",1.1,.06,.08); Tween(row,TweenInfo.new(.12),{BackgroundTransparency=.89}):Play() end); row.MouseLeave:Connect(function() Tween(row,TweenInfo.new(.12),{BackgroundTransparency=.95}):Play() end)
-			row.MouseButton1Click:Connect(function() playUISound("Select",1.04,.12,.03); if callback then callback(rv) end end)
-			return row
-		end
-		playerSettingRow("palette","Theme","Midnight",function() themePopup.Visible=not themePopup.Visible end,-60)
-		playerSettingRow("scan-line","Menu Scale","100%",function(value) settingsScale=settingsScale==100 and 110 or (settingsScale==110 and 90 or 100); baseUIScale.Scale=settingsScale/100; value.Text=settingsScale.."%" end,-59)
-		playerSettingRow("languages","Language",Settings.Language or "EN",function(value) value.Text=value.Text=="EN" and "VI" or "EN" end,-58)
-		playerSettingRow("keyboard","Menu Key",tostring((Settings.Keybind or Enum.KeyCode.RightControl).Name):gsub("RightControl","Right Ctrl"),nil,-57)
-		playerSettingRow("panels-top-left","View","Dock",function(value) local nextDock=not WindowFunctions:GetDockMode(); WindowFunctions:SetDockMode(nextDock); value.Text=nextDock and "Dock" or "Clean" end,-56)
-
-		local dockScroll=Instance.new("ScrollingFrame"); dockScroll.Name="Tabs"; dockScroll.Position=UDim2.fromOffset(182,4); dockScroll.Size=UDim2.new(1,-188,1,-8); dockScroll.BackgroundTransparency=1; dockScroll.BorderSizePixel=0; dockScroll.ScrollBarThickness=0; dockScroll.AutomaticCanvasSize=Enum.AutomaticSize.X; dockScroll.CanvasSize=UDim2.new(); dockScroll.ScrollingDirection=Enum.ScrollingDirection.X; dockScroll.ZIndex=182; dockScroll.Parent=dock
-		local dockLayout=Instance.new("UIListLayout"); dockLayout.FillDirection=Enum.FillDirection.Horizontal; dockLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center; dockLayout.VerticalAlignment=Enum.VerticalAlignment.Center; dockLayout.Padding=UDim.new(0,5); dockLayout.Parent=dockScroll
-		registerSpectrumTab=function(tabFunctions,tabSettings)
-			-- Spectrum dock mode is intentionally icon-only. The title is exposed by
-			-- the shared hover tooltip so the bar stays compact even with many tabs.
-			local b=Instance.new("TextButton"); b.AutoButtonColor=false; b.BackgroundColor3=Color3.fromRGB(255,255,255); b.BackgroundTransparency=.96; b.BorderSizePixel=0; b.Size=UDim2.fromOffset(36,34); b.Text=""; b.ZIndex=184; b.Parent=dockScroll
-			local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,7); c.Parent=b
-			local i=Instance.new("ImageLabel"); i.AnchorPoint=Vector2.new(.5,.5); i.BackgroundTransparency=1; i.Position=UDim2.fromScale(.5,.5); i.Size=UDim2.fromOffset(16,16); i.ZIndex=185; i.Parent=b; MacLib:ApplyIcon(i,tabSettings.Icon or tabSettings.Image or "circle",Color3.fromRGB(205,207,213))
-			b.MouseEnter:Connect(function() playUISound("Hover",1.1,.07,.08); Tween(b,TweenInfo.new(.12),{BackgroundTransparency=.89}):Play() end); b.MouseLeave:Connect(function() Tween(b,TweenInfo.new(.12),{BackgroundTransparency=.96}):Play() end)
-			b.MouseButton1Click:Connect(function() tabFunctions:Select(); playUISound("Select",1.04,.14,.03) end)
-			attachTooltip(b,tostring(tabSettings.Title or tabSettings.Name or "Tab"))
-			tabFunctions.DockButton=b
-		end
-
-		local function updateHorizontalHeader()
-			local width=base.AbsoluteSize.X
-			local compact=width<720
-			brand.Size=UDim2.fromOffset(compact and 138 or 205,26)
-			brand.TextSize=compact and 15 or 20
-			brandSub.Size=UDim2.fromOffset(compact and 138 or 205,15)
-			brandSub.TextSize=compact and 8 or 9
-			actions.Size=UDim2.fromOffset(compact and 196 or 520,36)
-			gameButton.Visible=not compact
-			languageButton.Visible=not compact
-			searchBar.Visible=not compact
-			playerCard.Size=UDim2.fromOffset(compact and 130 or 168,35)
-			dockScroll.Position=UDim2.fromOffset(compact and 138 or 182,4)
-			dockScroll.Size=UDim2.new(1,-(compact and 144 or 188),1,-8)
-		end
-		base:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateHorizontalHeader)
-		task.defer(updateHorizontalHeader)
-
-		-- Collapsible navigation group for related pages (for example Sea Events).
-		function WindowFunctions:NavigationGroup(options)
-			options=options or {}; local api={}; local entries={}
-			local popup=Instance.new("Frame"); popup.AnchorPoint=Vector2.new(0,1); popup.Position=UDim2.new(0,182,1,-70); popup.Size=UDim2.fromOffset(178,0); popup.AutomaticSize=Enum.AutomaticSize.Y; popup.BackgroundColor3=Color3.fromRGB(17,15,17); popup.BackgroundTransparency=.05; popup.BorderSizePixel=0; popup.Visible=false; popup.ZIndex=270; popup.Parent=base
-			local pc=Instance.new("UICorner"); pc.CornerRadius=UDim.new(0,9); pc.Parent=popup; local ps=Instance.new("UIStroke"); ps.Color=accentColor; ps.Transparency=.65; ps.Parent=popup; local pl=Instance.new("UIListLayout"); pl.Padding=UDim.new(0,3); pl.Parent=popup; local pp=Instance.new("UIPadding"); pp.PaddingTop=UDim.new(0,6); pp.PaddingBottom=UDim.new(0,6); pp.PaddingLeft=UDim.new(0,6); pp.PaddingRight=UDim.new(0,6); pp.Parent=popup
-			local trigger=Instance.new("TextButton"); trigger.AutoButtonColor=false; trigger.AutomaticSize=Enum.AutomaticSize.X; trigger.BackgroundColor3=Color3.fromRGB(255,255,255); trigger.BackgroundTransparency=.94; trigger.BorderSizePixel=0; trigger.Size=UDim2.fromOffset(44,34); trigger.Text="   "..tostring(options.Title or "Group").." ⌄"; trigger.TextColor3=Color3.fromRGB(225,227,232); trigger.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); trigger.TextSize=10; trigger.ZIndex=184; trigger.Parent=dockScroll; local tc=Instance.new("UICorner"); tc.CornerRadius=UDim.new(0,7); tc.Parent=trigger
-			trigger.MouseButton1Click:Connect(function() popup.Visible=not popup.Visible; playUISound("Dropdown",popup.Visible and 1.06 or .96,.14,.03) end)
-			function api:Add(tabFunctions,label,iconValue)
-				local row=Instance.new("TextButton"); row.AutoButtonColor=false; row.BackgroundColor3=Color3.fromRGB(255,255,255); row.BackgroundTransparency=1; row.BorderSizePixel=0; row.Size=UDim2.new(1,0,0,31); row.Text="   "..tostring(label or "Page"); row.TextColor3=Color3.fromRGB(225,227,232); row.TextSize=10; row.TextXAlignment=Enum.TextXAlignment.Left; row.ZIndex=272; row.Parent=popup; local rc=Instance.new("UICorner"); rc.CornerRadius=UDim.new(0,6); rc.Parent=row
-				row.MouseButton1Click:Connect(function() if tabFunctions and tabFunctions.Select then tabFunctions:Select() end; popup.Visible=false; playUISound("Select",1.04,.14,.03) end); table.insert(entries,row); return row
-			end
-			function api:SetOpen(v) popup.Visible=v==true end
-			return api
-		end
-	end
 
 	local BlurTarget = base
 
@@ -2595,14 +2383,13 @@ function MacLib:Window(Settings)
 					end
 
 					local function Callback()
-						playUISound("Click", 1, 0.18, 0.035)
+						MacLib:PlayUISound("Click")
 						if Settings.Callback then
 							Settings.Callback()
 						end
 					end
 
 					buttonInteract.MouseEnter:Connect(function()
-						playUISound("Hover", 1.12, 0.07, 0.08)
 						ChangeState("Hover")
 					end)
 					buttonInteract.MouseLeave:Connect(function()
@@ -3207,7 +2994,6 @@ function MacLib:Window(Settings)
 
 					local function Toggle()
 						togglebool = not togglebool
-						playUISound("Toggle", togglebool and 1.08 or .94, .12, .035)
 						ToggleState(togglebool)
 						if Settings.Callback then
 							Settings.Callback(togglebool)
@@ -3423,7 +3209,6 @@ function MacLib:Window(Settings)
 						return ok and tostring(result) or tostring(value)
 					end
 					local finalValue
-					local lastSliderSoundValue
 
 					local function SetValue(val, ignorecallback)
 						local posXScale
@@ -3446,13 +3231,6 @@ function MacLib:Window(Settings)
 
 						finalValue = posXScale * range + minimum
 						sliderValue.Text = FormatSliderValue(finalValue)
-						if dragging then
-							local soundStep = math.floor(posXScale * 24 + 0.5)
-							if soundStep ~= lastSliderSoundValue then
-								lastSliderSoundValue = soundStep
-								playUISound("Tick", 0.94 + posXScale * 0.18, 0.10, 0.022)
-							end
-						end
 
 						if not ignorecallback then
 							task.spawn(function()
@@ -4145,7 +3923,7 @@ function MacLib:Window(Settings)
 						db = true
 						local defaultDropdownSize = 38
 						local isDropdownOpen = not dropped
-						playUISound("Dropdown", isDropdownOpen and 1.07 or .95, .13, .035)
+						MacLib:PlayUISound(isDropdownOpen and "Open" or "Click")
 						local targetSize = isDropdownOpen and UDim2.new(1, 0, 0, CalculateDropdownSize()) or UDim2.new(1, 0, 0, defaultDropdownSize)
 
 						local tween = Tween(dropdown, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
@@ -4211,7 +3989,22 @@ function MacLib:Window(Settings)
 						optionName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 						optionName.BorderSizePixel = 0
 						optionName.Position = UDim2.fromScale(1.3e-07, 0.5)
+						optionName.LayoutOrder = 1
 						optionName.Parent = option
+
+						local optionIcon
+						local optionIcons = Settings.OptionIcons or Settings.Icons
+						local iconValue = type(optionIcons) == "table" and (optionIcons[v] or optionIcons[i]) or nil
+						if iconValue then
+							optionIcon = Instance.new("ImageLabel")
+							optionIcon.Name = "OptionIcon"
+							optionIcon.BackgroundTransparency = 1
+							optionIcon.ImageTransparency = 0.18
+							optionIcon.LayoutOrder = 0
+							optionIcon.Size = UDim2.fromOffset(18, 18)
+							optionIcon.Parent = option
+							MacLib:ApplyIcon(optionIcon, iconValue, Settings.OptionIconColor or Color3.fromRGB(235, 237, 242))
+						end
 
 						local optionUIListLayout = Instance.new("UIListLayout")
 						optionUIListLayout.Name = "OptionUIListLayout"
@@ -4252,7 +4045,8 @@ function MacLib:Window(Settings)
 							Index = i,
 							Button = option,
 							NameLabel = optionName,
-							Checkmark = checkmark
+							Checkmark = checkmark,
+							Icon = optionIcon
 						}
 
 						local tweensettings = {
@@ -4292,7 +4086,7 @@ function MacLib:Window(Settings)
 						local option = OptionObjs[v].Button
 
 						option.MouseButton1Click:Connect(function()
-							playUISound("Select", 1.05, .12, .03)
+							MacLib:PlayUISound("Select")
 							local isSelected = table.find(Selected, v) and true or false
 							local newSelected = not isSelected
 
@@ -5903,219 +5697,6 @@ function MacLib:Window(Settings)
 					return StatusFunctions
 				end
 
-				-- Large transparent brand block. Designed for a home/overview page and
-				-- accepts either Lucide icons or rbxassetid images for the logo/game art.
-				function SectionFunctions:Hero(Settings)
-					Settings = Settings or {}
-					local HeroFunctions = {}
-					local card, stroke = createModernCard("Hero", tonumber(Settings.Height) or 94)
-					card.BackgroundTransparency = tonumber(Settings.Transparency) or 0.975
-
-					local logo = Instance.new("ImageLabel")
-					logo.Name = "Logo"
-					logo.BackgroundTransparency = 1
-					logo.Position = UDim2.fromOffset(13, 14)
-					logo.Size = UDim2.fromOffset(58, 58)
-					logo.ScaleType = Enum.ScaleType.Fit
-					logo.Parent = card
-					MacLib:ApplyIcon(logo, Settings.Logo or Settings.Icon or "sparkles", Settings.LogoColor or Color3.fromRGB(245,245,245))
-
-					local brand = Instance.new("TextLabel")
-					brand.BackgroundTransparency = 1
-					brand.FontFace = Font.new(assets.interFont, Enum.FontWeight.Bold, Enum.FontStyle.Normal)
-					brand.Position = UDim2.fromOffset(82, 14)
-					brand.Size = UDim2.new(1, -250, 0, 31)
-					brand.Text = tostring(Settings.Title or Settings.Brand or "MACLIB")
-					brand.TextColor3 = Settings.TitleColor or Color3.fromRGB(248,248,248)
-					brand.TextSize = tonumber(Settings.TitleSize) or 25
-					brand.TextTransparency = 0.04
-					brand.TextTruncate = Enum.TextTruncate.AtEnd
-					brand.TextXAlignment = Enum.TextXAlignment.Left
-					brand.Parent = card
-
-					local sub = Instance.new("TextLabel")
-					sub.BackgroundTransparency = 1
-					sub.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
-					sub.Position = UDim2.fromOffset(84, 48)
-					sub.Size = UDim2.new(1, -255, 0, 19)
-					sub.Text = tostring(Settings.Subtitle or Settings.Description or "Modern automation interface")
-					sub.TextColor3 = Color3.fromRGB(255,255,255)
-					sub.TextSize = 11
-					sub.TextTransparency = 0.55
-					sub.TextTruncate = Enum.TextTruncate.AtEnd
-					sub.TextXAlignment = Enum.TextXAlignment.Left
-					sub.Parent = card
-
-					local gameBadge = Instance.new("Frame")
-					gameBadge.AnchorPoint = Vector2.new(1, 0.5)
-					gameBadge.BackgroundColor3 = Settings.Accent or accentColor
-					gameBadge.BackgroundTransparency = 0.89
-					gameBadge.Position = UDim2.new(1, -13, .5, 0)
-					gameBadge.Size = UDim2.fromOffset(150, 48)
-					gameBadge.Parent = card
-					local gameCorner = Instance.new("UICorner"); gameCorner.CornerRadius = UDim.new(0, 8); gameCorner.Parent = gameBadge
-					local gameStroke = Instance.new("UIStroke"); gameStroke.Color = Settings.Accent or accentColor; gameStroke.Transparency = .76; gameStroke.Parent = gameBadge
-					local gameIcon = Instance.new("ImageLabel")
-					gameIcon.BackgroundTransparency = 1; gameIcon.Position = UDim2.fromOffset(8,8); gameIcon.Size = UDim2.fromOffset(32,32); gameIcon.ScaleType = Enum.ScaleType.Crop; gameIcon.Parent = gameBadge
-					local gameIconCorner = Instance.new("UICorner"); gameIconCorner.CornerRadius = UDim.new(0,7); gameIconCorner.Parent = gameIcon
-					MacLib:ApplyIcon(gameIcon, Settings.GameIcon or Settings.Icon or "gamepad-2", Color3.fromRGB(255,255,255))
-					local gameText = Instance.new("TextLabel")
-					gameText.BackgroundTransparency = 1; gameText.Position = UDim2.fromOffset(48,0); gameText.Size = UDim2.new(1,-55,1,0)
-					gameText.FontFace = Font.new(assets.interFont,Enum.FontWeight.SemiBold,Enum.FontStyle.Normal); gameText.Text = tostring(Settings.Game or Settings.GameName or "Detected Game")
-					gameText.TextColor3 = Color3.fromRGB(245,245,245); gameText.TextSize = 11; gameText.TextTruncate = Enum.TextTruncate.AtEnd; gameText.TextXAlignment = Enum.TextXAlignment.Left; gameText.Parent = gameBadge
-
-					function HeroFunctions:SetTitle(v) brand.Text = tostring(v or "") end
-					function HeroFunctions:SetSubtitle(v) sub.Text = tostring(v or "") end
-					function HeroFunctions:SetLogo(v,color) return MacLib:ApplyIcon(logo,v,color or Color3.fromRGB(245,245,245)) end
-					function HeroFunctions:SetGame(v,iconValue) gameText.Text=tostring(v or ""); if iconValue then MacLib:ApplyIcon(gameIcon,iconValue,Color3.fromRGB(255,255,255)) end end
-					function HeroFunctions:SetVisibility(v) card.Visible = v == true end
-					return HeroFunctions
-				end
-
-				-- Spectrum-inspired but original NNVN status panel: circular image/icon,
-				-- title/description, a state pill and up to four live metrics.
-				function SectionFunctions:FeatureStatus(Settings)
-					Settings = Settings or {}
-					local FeatureFunctions = { Metrics = {} }
-					local color = Settings.Color or Settings.Accent or accentColor
-					local metrics = Settings.Metrics or {}
-					local card, stroke = createModernCard("FeatureStatus", tonumber(Settings.Height) or 142)
-					-- Keep status panels neutral/dark. State color belongs to the rail,
-					-- icon and badge only, so active cards never turn into a bright block.
-					card.BackgroundColor3 = Settings.BackgroundColor or Color3.fromRGB(13,12,14)
-					card.BackgroundTransparency = tonumber(Settings.Transparency) or .22
-					stroke.Color = color; stroke.Transparency = .76
-					local rail = Instance.new("Frame"); rail.BackgroundColor3=color; rail.BorderSizePixel=0; rail.Position=UDim2.fromOffset(0,12); rail.Size=UDim2.fromOffset(3,50); rail.Parent=card
-					local railCorner=Instance.new("UICorner"); railCorner.CornerRadius=UDim.new(1,0); railCorner.Parent=rail
-
-					local iconCircle = Instance.new("Frame")
-					iconCircle.BackgroundColor3=color; iconCircle.BackgroundTransparency=.76; iconCircle.Position=UDim2.fromOffset(16,13); iconCircle.Size=UDim2.fromOffset(50,50); iconCircle.Parent=card
-					local iconCorner=Instance.new("UICorner"); iconCorner.CornerRadius=UDim.new(1,0); iconCorner.Parent=iconCircle
-					local iconStroke=Instance.new("UIStroke"); iconStroke.Color=color; iconStroke.Transparency=.30; iconStroke.Thickness=2; iconStroke.Parent=iconCircle
-					local icon=Instance.new("ImageLabel"); icon.BackgroundTransparency=1; icon.AnchorPoint=Vector2.new(.5,.5); icon.Position=UDim2.fromScale(.5,.5); icon.Size=UDim2.fromOffset(28,28); icon.ScaleType=Enum.ScaleType.Fit; icon.Parent=iconCircle
-					MacLib:ApplyIcon(icon,Settings.Image or Settings.Icon or "activity",Settings.IconColor or color)
-
-					local title=Instance.new("TextLabel"); title.BackgroundTransparency=1; title.Position=UDim2.fromOffset(78,13); title.Size=UDim2.new(1,-180,0,23)
-					title.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold,Enum.FontStyle.Normal); title.Text=tostring(Settings.Title or "Feature is off"); title.TextColor3=Color3.fromRGB(248,248,248); title.TextSize=15; title.TextXAlignment=Enum.TextXAlignment.Left; title.Parent=card
-					local description=Instance.new("TextLabel"); description.BackgroundTransparency=1; description.Position=UDim2.fromOffset(78,38); description.Size=UDim2.new(1,-95,0,18)
-					description.FontFace=Font.new(assets.interFont); description.Text=tostring(Settings.Description or "Turn on a setting below to start"); description.TextColor3=Color3.fromRGB(255,255,255); description.TextTransparency=.55; description.TextSize=11; description.TextTruncate=Enum.TextTruncate.AtEnd; description.TextXAlignment=Enum.TextXAlignment.Left; description.Parent=card
-
-					local badge=Instance.new("TextLabel"); badge.AnchorPoint=Vector2.new(1,0); badge.AutomaticSize=Enum.AutomaticSize.X; badge.Position=UDim2.new(1,-15,0,20); badge.Size=UDim2.fromOffset(0,22)
-					badge.BackgroundColor3=color; badge.BackgroundTransparency=.80; badge.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold,Enum.FontStyle.Normal); badge.Text=tostring(Settings.Status or "Idle"); badge.TextColor3=Settings.Active and color or Color3.fromRGB(215,205,205); badge.TextSize=10; badge.Parent=card
-					local badgePadding=Instance.new("UIPadding"); badgePadding.PaddingLeft=UDim.new(0,9); badgePadding.PaddingRight=UDim.new(0,9); badgePadding.Parent=badge
-					local badgeCorner=Instance.new("UICorner"); badgeCorner.CornerRadius=UDim.new(1,0); badgeCorner.Parent=badge
-
-					local metricRow=Instance.new("Frame"); metricRow.BackgroundColor3=Color3.fromRGB(0,0,0); metricRow.BackgroundTransparency=.68; metricRow.Position=UDim2.fromOffset(15,76); metricRow.Size=UDim2.new(1,-30,0,51); metricRow.Parent=card
-					local rowCorner=Instance.new("UICorner"); rowCorner.CornerRadius=UDim.new(0,8); rowCorner.Parent=metricRow
-					local rowStroke=Instance.new("UIStroke"); rowStroke.Color=color; rowStroke.Transparency=.88; rowStroke.Parent=metricRow
-					local rowLayout=Instance.new("UIListLayout"); rowLayout.FillDirection=Enum.FillDirection.Horizontal; rowLayout.SortOrder=Enum.SortOrder.LayoutOrder; rowLayout.Parent=metricRow
-					for index=1,math.max(1,math.min(#metrics,4)) do
-						local data=metrics[index] or {}
-						local cell=Instance.new("Frame"); cell.BackgroundTransparency=1; cell.Size=UDim2.new(1/math.max(1,math.min(#metrics,4)),0,1,0); cell.Parent=metricRow
-						if index>1 then local divider=Instance.new("Frame"); divider.BackgroundColor3=Color3.fromRGB(255,255,255); divider.BackgroundTransparency=.90; divider.BorderSizePixel=0; divider.Size=UDim2.new(0,1,0,26); divider.Position=UDim2.new(0,0,.5,-13); divider.Parent=cell end
-						local mini=Instance.new("Frame"); mini.BackgroundColor3=color; mini.BackgroundTransparency=.82; mini.Position=UDim2.fromOffset(10,11); mini.Size=UDim2.fromOffset(28,28); mini.Parent=cell
-						local miniCorner=Instance.new("UICorner"); miniCorner.CornerRadius=UDim.new(1,0); miniCorner.Parent=mini
-						local miniIcon=Instance.new("ImageLabel"); miniIcon.BackgroundTransparency=1; miniIcon.AnchorPoint=Vector2.new(.5,.5); miniIcon.Position=UDim2.fromScale(.5,.5); miniIcon.Size=UDim2.fromOffset(13,13); miniIcon.Parent=mini; MacLib:ApplyIcon(miniIcon,data.Icon or "circle-dot",data.Color or color)
-						local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Position=UDim2.fromOffset(45,6); value.Size=UDim2.new(1,-49,0,20); value.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold,Enum.FontStyle.Normal); value.Text=tostring(data.Value or "-"); value.TextColor3=Color3.fromRGB(248,248,248); value.TextSize=12; value.TextTruncate=Enum.TextTruncate.AtEnd; value.TextXAlignment=Enum.TextXAlignment.Left; value.Parent=cell
-						local label=Instance.new("TextLabel"); label.BackgroundTransparency=1; label.Position=UDim2.fromOffset(45,26); label.Size=UDim2.new(1,-49,0,14); label.FontFace=Font.new(assets.interFont); label.Text=tostring(data.Label or data.Name or "Metric"); label.TextColor3=Color3.fromRGB(255,255,255); label.TextTransparency=.58; label.TextSize=9; label.TextTruncate=Enum.TextTruncate.AtEnd; label.TextXAlignment=Enum.TextXAlignment.Left; label.Parent=cell
-						FeatureFunctions.Metrics[index]={Value=value,Label=label,Icon=miniIcon,Cell=cell}
-					end
-
-					function FeatureFunctions:SetActive(active,text)
-						badge.Text=tostring(text or (active and "Active" or "Idle")); badge.TextColor3=active and color or Color3.fromRGB(215,205,205); card.BackgroundTransparency=tonumber(Settings.Transparency) or .22
-					end
-					function FeatureFunctions:SetStatus(text,newColor) badge.Text=tostring(text or ""); if newColor then color=newColor; badge.BackgroundColor3=newColor; iconStroke.Color=newColor; rail.BackgroundColor3=newColor end end
-					function FeatureFunctions:SetMetric(index,value,label,newIcon)
-						local metric=FeatureFunctions.Metrics[index]; if not metric then return end
-						metric.Value.Text=tostring(value or "-"); if label~=nil then metric.Label.Text=tostring(label) end; if newIcon then MacLib:ApplyIcon(metric.Icon,newIcon,color) end
-					end
-					function FeatureFunctions:SetTitle(v) title.Text=tostring(v or "") end
-					function FeatureFunctions:SetDescription(v) description.Text=tostring(v or "") end
-					function FeatureFunctions:SetIcon(v,c) return MacLib:ApplyIcon(icon,v,c or color) end
-					function FeatureFunctions:SetVisibility(v) card.Visible=v==true end
-					return FeatureFunctions
-				end
-
-				-- Image cards for inventories, bosses or collections. Each item may use
-				-- Image/Icon, Title, Subtitle, Color and Callback.
-				function SectionFunctions:ImageGrid(Settings)
-					Settings=Settings or {}
-					local GridFunctions={Items={}}
-					local columns=math.clamp(tonumber(Settings.Columns) or 3,2,6)
-					local tileHeight=tonumber(Settings.TileHeight) or 106
-					local items=Settings.Items or Settings.Values or {}
-					local grid=Instance.new("Frame"); grid.Name="ImageGrid"; grid.AutomaticSize=Enum.AutomaticSize.Y; grid.BackgroundTransparency=1; grid.Size=UDim2.new(1,0,0,0); grid.Parent=section
-					local layout=Instance.new("UIGridLayout"); layout.CellPadding=UDim2.fromOffset(7,7); layout.CellSize=UDim2.new(1/columns,-7,0,tileHeight); layout.SortOrder=Enum.SortOrder.LayoutOrder; layout.Parent=grid
-					local function addItem(data,index)
-						local color=data.Color or accentColor
-						local tile=Instance.new("TextButton"); tile.Name="ImageItem"..index; tile.AutoButtonColor=false; tile.BackgroundColor3=Color3.fromRGB(255,255,255); tile.BackgroundTransparency=.95; tile.BorderSizePixel=0; tile.Text=""; tile.Parent=grid
-						local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,7); corner.Parent=tile
-						local border=Instance.new("UIStroke"); border.Color=color; border.Transparency=.55; border.Parent=tile
-						local image=Instance.new("ImageLabel"); image.BackgroundTransparency=1; image.Position=UDim2.fromOffset(7,7); image.Size=UDim2.new(1,-14,1,-40); image.ScaleType=Enum.ScaleType.Fit; image.Parent=tile; MacLib:ApplyIcon(image,data.Image or data.Icon or "package",data.ImageColor or Color3.fromRGB(255,255,255))
-						local name=Instance.new("TextLabel"); name.BackgroundTransparency=1; name.Position=UDim2.new(0,5,1,-31); name.Size=UDim2.new(1,-10,0,15); name.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium,Enum.FontStyle.Normal); name.Text=tostring(data.Title or data.Name or "Item"); name.TextColor3=Color3.fromRGB(245,245,245); name.TextSize=10; name.TextTruncate=Enum.TextTruncate.AtEnd; name.Parent=tile
-						local sub=Instance.new("TextLabel"); sub.BackgroundTransparency=1; sub.Position=UDim2.new(0,5,1,-16); sub.Size=UDim2.new(1,-10,0,11); sub.FontFace=Font.new(assets.interFont); sub.Text=tostring(data.Subtitle or ""); sub.TextColor3=color; sub.TextSize=8; sub.TextTruncate=Enum.TextTruncate.AtEnd; sub.Parent=tile
-						tile.MouseEnter:Connect(function() Tween(tile,TweenInfo.new(.14,Enum.EasingStyle.Sine),{BackgroundTransparency=.89}):Play(); Tween(border,TweenInfo.new(.14),{Transparency=.25}):Play() end)
-						tile.MouseLeave:Connect(function() Tween(tile,TweenInfo.new(.14,Enum.EasingStyle.Sine),{BackgroundTransparency=.95}):Play(); Tween(border,TweenInfo.new(.14),{Transparency=.55}):Play() end)
-						tile.MouseButton1Click:Connect(function() playUISound("Click",1.04,.16,.035); if data.Callback then task.spawn(data.Callback,index,data) end end)
-						GridFunctions.Items[index]={Instance=tile,Image=image,Title=name,Subtitle=sub,Stroke=border}
-					end
-					for i,data in ipairs(items) do addItem(data,i) end
-					function GridFunctions:SetItem(index,data) local item=GridFunctions.Items[index]; if not item then return end; if data.Title then item.Title.Text=tostring(data.Title) end; if data.Subtitle then item.Subtitle.Text=tostring(data.Subtitle) end; if data.Image or data.Icon then MacLib:ApplyIcon(item.Image,data.Image or data.Icon,data.ImageColor or Color3.fromRGB(255,255,255)) end end
-					function GridFunctions:SetVisibility(v) grid.Visible=v==true end
-					return GridFunctions
-				end
-
-				-- Rich text + image card used by event trackers, boss lists, changelogs
-				-- and any row where a plain paragraph would be too dense.
-				function SectionFunctions:MediaList(Settings)
-					Settings=Settings or {}
-					local MediaFunctions={Items={}}
-					local list=Instance.new("Frame"); list.Name="MediaList"; list.AutomaticSize=Enum.AutomaticSize.Y; list.BackgroundTransparency=1; list.Size=UDim2.new(1,0,0,0); list.Parent=section
-					local layout=Instance.new("UIListLayout"); layout.Padding=UDim.new(0,7); layout.SortOrder=Enum.SortOrder.LayoutOrder; layout.Parent=list
-					local function createRow(data,index)
-						data=data or {}
-						local color=data.Color or Settings.Color or accentColor
-						local height=tonumber(data.Height or Settings.RowHeight) or 66
-						local row=Instance.new("TextButton"); row.Name="MediaItem"..index; row.AutoButtonColor=false; row.BackgroundColor3=Color3.fromRGB(17,16,18); row.BackgroundTransparency=.26; row.BorderSizePixel=0; row.Size=UDim2.new(1,0,0,height); row.Text=""; row.Parent=list
-						local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,8); corner.Parent=row
-						local stroke=Instance.new("UIStroke"); stroke.Color=color; stroke.Transparency=.84; stroke.Parent=row
-						local imageHolder=Instance.new("Frame"); imageHolder.BackgroundColor3=color; imageHolder.BackgroundTransparency=.86; imageHolder.Position=UDim2.fromOffset(9,9); imageHolder.Size=UDim2.fromOffset(height-18,height-18); imageHolder.Parent=row
-						local ihCorner=Instance.new("UICorner"); ihCorner.CornerRadius=UDim.new(0,8); ihCorner.Parent=imageHolder
-						local image=Instance.new("ImageLabel"); image.BackgroundTransparency=1; image.Position=UDim2.fromOffset(5,5); image.Size=UDim2.new(1,-10,1,-10); image.ScaleType=Enum.ScaleType.Fit; image.Parent=imageHolder
-						MacLib:ApplyIcon(image,data.Image or data.Icon or "image",data.ImageColor or Color3.fromRGB(245,245,245))
-						local left=height+2
-						local title=Instance.new("TextLabel"); title.BackgroundTransparency=1; title.Position=UDim2.fromOffset(left,8); title.Size=UDim2.new(1,-left-86,0,20); title.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); title.Text=tostring(data.Title or data.Name or "Item"); title.TextColor3=Color3.fromRGB(246,246,248); title.TextSize=12; title.TextTruncate=Enum.TextTruncate.AtEnd; title.TextXAlignment=Enum.TextXAlignment.Left; title.Parent=row
-						local description=Instance.new("TextLabel"); description.BackgroundTransparency=1; description.Position=UDim2.fromOffset(left,29); description.Size=UDim2.new(1,-left-12,0,height-35); description.FontFace=Font.new(assets.interFont); description.Text=tostring(data.Description or data.Subtitle or ""); description.TextColor3=Color3.fromRGB(255,255,255); description.TextTransparency=.50; description.TextSize=10; description.TextWrapped=true; description.TextTruncate=Enum.TextTruncate.AtEnd; description.TextXAlignment=Enum.TextXAlignment.Left; description.TextYAlignment=Enum.TextYAlignment.Top; description.Parent=row
-						local badge=Instance.new("TextLabel"); badge.AnchorPoint=Vector2.new(1,0); badge.AutomaticSize=Enum.AutomaticSize.X; badge.BackgroundColor3=color; badge.BackgroundTransparency=.84; badge.Position=UDim2.new(1,-9,0,9); badge.Size=UDim2.fromOffset(0,19); badge.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); badge.Text=tostring(data.Badge or data.Status or ""); badge.TextColor3=color; badge.TextSize=9; badge.Visible=badge.Text~=""; badge.Parent=row
-						local bp=Instance.new("UIPadding"); bp.PaddingLeft=UDim.new(0,7); bp.PaddingRight=UDim.new(0,7); bp.Parent=badge
-						local bc=Instance.new("UICorner"); bc.CornerRadius=UDim.new(1,0); bc.Parent=badge
-						row.MouseEnter:Connect(function() playUISound("Hover",1.1,.06,.08); Tween(row,TweenInfo.new(.14),{BackgroundTransparency=.14}):Play(); Tween(stroke,TweenInfo.new(.14),{Transparency=.55}):Play() end)
-						row.MouseLeave:Connect(function() Tween(row,TweenInfo.new(.14),{BackgroundTransparency=.26}):Play(); Tween(stroke,TweenInfo.new(.14),{Transparency=.84}):Play() end)
-						row.MouseButton1Click:Connect(function() playUISound("Click",1.04,.15,.03); if data.Callback then task.spawn(data.Callback,index,data) end end)
-						if data.Tooltip then attachTooltip(row,data.Tooltip) end
-						local item={Instance=row,Image=image,ImageHolder=imageHolder,Title=title,Description=description,Badge=badge,Stroke=stroke}
-						MediaFunctions.Items[index]=item
-						return item
-					end
-					for index,data in ipairs(Settings.Items or Settings.Values or {}) do createRow(data,index) end
-					function MediaFunctions:Add(data) return createRow(data,#MediaFunctions.Items+1) end
-					function MediaFunctions:SetItem(index,data)
-						local item=MediaFunctions.Items[index]; if not item or not data then return end
-						if data.Title then item.Title.Text=tostring(data.Title) end
-						if data.Description or data.Subtitle then item.Description.Text=tostring(data.Description or data.Subtitle) end
-						if data.Badge or data.Status then item.Badge.Text=tostring(data.Badge or data.Status); item.Badge.Visible=item.Badge.Text~="" end
-						if data.Image or data.Icon then MacLib:ApplyIcon(item.Image,data.Image or data.Icon,data.ImageColor or Color3.fromRGB(245,245,245)) end
-					end
-					function MediaFunctions:SetVisibility(v) list.Visible=v==true end
-					return MediaFunctions
-				end
-
-				SectionFunctions.TrackerList=SectionFunctions.MediaList
-				SectionFunctions.CollectionGrid=SectionFunctions.ImageGrid
-				SectionFunctions.AddMediaList=SectionFunctions.MediaList
-				SectionFunctions.AddTrackerList=SectionFunctions.MediaList
-				SectionFunctions.AddCollectionGrid=SectionFunctions.ImageGrid
-
 				function SectionFunctions:ButtonRow(Settings)
 					Settings = Settings or {}
 					local RowFunctions = { Buttons = {} }
@@ -6819,6 +6400,56 @@ function MacLib:Window(Settings)
 					attachTooltip(paragraph, Settings.Tooltip)
 					return ParagraphFunctions
 				end
+
+				-- Compact image + text card for game, item and event previews.
+				function SectionFunctions:AddMediaBox(IdOrSettings, MaybeSettings)
+					local Settings = type(IdOrSettings) == "table" and IdOrSettings or (MaybeSettings or {})
+					local MediaFunctions = {}
+					local card = Instance.new("Frame")
+					card.Name = tostring(type(IdOrSettings) == "string" and IdOrSettings or "MediaBox")
+					card.BackgroundColor3 = Settings.BackgroundColor or Color3.fromRGB(255,255,255)
+					card.BackgroundTransparency = Settings.BackgroundTransparency or 0.955
+					card.BorderSizePixel = 0
+					card.Size = UDim2.new(1,0,0,96)
+					card.Parent = section
+					local corner = Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,9); corner.Parent=card
+					local stroke = Instance.new("UIStroke"); stroke.Color=Color3.fromRGB(255,255,255); stroke.Transparency=0.9; stroke.Parent=card
+					local image = Instance.new("ImageLabel")
+					image.Name="Media"; image.BackgroundColor3=Color3.fromRGB(10,11,14); image.BackgroundTransparency=.18
+					image.Position=UDim2.fromOffset(10,10); image.Size=UDim2.fromOffset(76,76); image.ScaleType=Enum.ScaleType.Crop; image.Parent=card
+					local imageCorner=Instance.new("UICorner"); imageCorner.CornerRadius=UDim.new(0,8); imageCorner.Parent=image
+					MacLib:ApplyIcon(image, Settings.Image or Settings.Icon or "image", Settings.ImageColor)
+					local title=Instance.new("TextLabel")
+					title.BackgroundTransparency=1; title.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold,Enum.FontStyle.Normal)
+					title.Position=UDim2.fromOffset(98,13); title.Size=UDim2.new(1,-110,0,22); title.Text=tostring(Settings.Title or "Media")
+					title.TextColor3=Color3.fromRGB(245,245,247); title.TextSize=14; title.TextXAlignment=Enum.TextXAlignment.Left; title.TextTruncate=Enum.TextTruncate.AtEnd; title.Parent=card
+					local description=Instance.new("TextLabel")
+					description.BackgroundTransparency=1; description.FontFace=Font.new(assets.interFont); description.Position=UDim2.fromOffset(98,37)
+					description.Size=UDim2.new(1,-110,0,44); description.Text=tostring(Settings.Description or Settings.Content or "")
+					description.TextColor3=Color3.fromRGB(220,222,228); description.TextTransparency=.38; description.TextSize=11
+					description.TextWrapped=true; description.TextXAlignment=Enum.TextXAlignment.Left; description.TextYAlignment=Enum.TextYAlignment.Top; description.Parent=card
+					if Settings.Badge then
+						local badge=Instance.new("TextLabel"); badge.AnchorPoint=Vector2.new(1,0); badge.BackgroundColor3=Settings.BadgeColor or accentColor; badge.BackgroundTransparency=.18
+						badge.Position=UDim2.new(1,-8,0,8); badge.Size=UDim2.fromOffset(54,20); badge.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold,Enum.FontStyle.Normal)
+						badge.Text=tostring(Settings.Badge); badge.TextColor3=Color3.new(1,1,1); badge.TextSize=9; badge.Parent=card
+						local badgeCorner=Instance.new("UICorner"); badgeCorner.CornerRadius=UDim.new(0,5); badgeCorner.Parent=badge
+					end
+					if Settings.Callback then
+						local hit=Instance.new("TextButton"); hit.BackgroundTransparency=1; hit.Text=""; hit.Size=UDim2.fromScale(1,1); hit.Parent=card
+						hit.MouseButton1Click:Connect(function() MacLib:PlayUISound("Click"); task.spawn(Settings.Callback) end)
+					end
+					function MediaFunctions:SetImage(value) MacLib:ApplyIcon(image,value,Settings.ImageColor) end
+					function MediaFunctions:SetTitle(value) title.Text=tostring(value or "") end
+					function MediaFunctions:SetDescription(value) description.Text=tostring(value or "") end
+					function MediaFunctions:SetVisibility(value) card.Visible=value==true end
+					function MediaFunctions:Destroy() card:Destroy() end
+					attachTooltip(card,Settings.Tooltip)
+					return MediaFunctions
+				end
+
+				function SectionFunctions:MediaBox(Settings)
+					return self:AddMediaBox(Settings or {})
+				end
 				
 				function SectionFunctions:Divider()
 					local DividerFunctions = {}
@@ -6920,7 +6551,6 @@ function MacLib:Window(Settings)
 			end
 
 			tabSwitcher.MouseButton1Click:Connect(function()
-				playUISound("Click", 1.04, 0.15, 0.035)
 				SelectCurrentTab()
 			end)
 
@@ -6933,7 +6563,6 @@ function MacLib:Window(Settings)
 
 			tabSwitcher.MouseEnter:Connect(function()
 				if tabs[tabSwitcher] == currentTabInstance then return end
-				playUISound("Hover", 1.1, .07, .08)
 				Tween(tabSwitcher, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {
 					BackgroundTransparency = 0.93
 				}):Play()
@@ -6964,16 +6593,101 @@ function MacLib:Window(Settings)
 			end
 
 			tabs[tabSwitcher] = elements1
+			-- Public handles used by NavigationGroup. They intentionally expose
+			-- only the switcher/content pair and keep the rest of the tab private.
+			TabFunctions.DockButton = tabSwitcher
+			TabFunctions.Content = elements1
+			TabFunctions.Name = Settings.Name
 			table.insert(windowTabs, TabFunctions)
 			TabFunctions.Index = #windowTabs
-			TabFunctions.Name = Settings.Name
-			TabFunctions.Icon = Settings.Icon or Settings.Image
-			TabFunctions.Button = tabSwitcher
-			if registerSpectrumTab then registerSpectrumTab(TabFunctions, Settings) end
 			if #windowTabs == 1 and autoSelectTabs then
 				task.defer(SelectCurrentTab)
 			end
 			return TabFunctions
+		end
+
+		function SectionFunctions:NavigationGroup(Settings)
+			Settings = Settings or {}
+			local group = { Children = {}, Expanded = Settings.Expanded ~= false }
+			local rowHeight = tonumber(Settings.RowHeight) or 34
+			local headerHeight = tonumber(Settings.HeaderHeight) or 38
+
+			local holder = Instance.new("Frame")
+			holder.Name = "NavigationGroup"
+			holder.BackgroundTransparency = 1
+			holder.BorderSizePixel = 0
+			holder.ClipsDescendants = true
+			holder.Size = UDim2.new(1, 0, 0, headerHeight)
+			holder.Parent = sectionTabSwitchers
+
+			local header = Instance.new("TextButton")
+			header.Name = "Header"
+			header.AutoButtonColor = false
+			header.BackgroundColor3 = Color3.fromRGB(255,255,255)
+			header.BackgroundTransparency = .985
+			header.BorderSizePixel = 0
+			header.Size = UDim2.new(1,-21,0,headerHeight)
+			header.Position = UDim2.new(.5,0,0,0)
+			header.AnchorPoint = Vector2.new(.5,0)
+			header.Text = ""
+			header.Parent = holder
+			local corner = Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,5); corner.Parent=header
+
+			local icon = Instance.new("ImageLabel")
+			icon.Name="Icon"; icon.BackgroundTransparency=1; icon.Size=UDim2.fromOffset(16,16)
+			icon.Position=UDim2.fromOffset(24,math.floor((headerHeight-16)/2)); icon.Parent=header
+			MacLib:ApplyIcon(icon, Settings.Icon or "folder", Settings.IconColor or Color3.fromRGB(235,235,238))
+
+			local title = Instance.new("TextLabel")
+			title.Name="Title"; title.BackgroundTransparency=1; title.Position=UDim2.fromOffset(49,0)
+			title.Size=UDim2.new(1,-88,1,0); title.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold)
+			title.Text=tostring(Settings.Title or Settings.Name or "Group"); title.TextSize=15
+			title.TextColor3=Color3.fromRGB(238,238,241); title.TextXAlignment=Enum.TextXAlignment.Left; title.Parent=header
+
+			local arrow = Instance.new("TextLabel")
+			arrow.Name="Arrow"; arrow.BackgroundTransparency=1; arrow.AnchorPoint=Vector2.new(.5,.5)
+			arrow.Position=UDim2.new(1,-25,.5,0); arrow.Size=UDim2.fromOffset(20,20)
+			arrow.Font=Enum.Font.GothamBold; arrow.Text="⌄"; arrow.TextSize=17
+			arrow.TextColor3=Color3.fromRGB(205,207,214); arrow.Rotation=group.Expanded and 0 or -90; arrow.Parent=header
+
+			local children = Instance.new("Frame")
+			children.Name="Children"; children.BackgroundTransparency=1; children.BorderSizePixel=0
+			children.ClipsDescendants=true; children.Position=UDim2.fromOffset(0,headerHeight)
+			children.Size=UDim2.new(1,0,0,0); children.Parent=holder
+			local list=Instance.new("UIListLayout"); list.SortOrder=Enum.SortOrder.LayoutOrder
+			list.Padding=UDim.new(0,2); list.HorizontalAlignment=Enum.HorizontalAlignment.Center; list.Parent=children
+
+			local function expandedHeight()
+				return #group.Children>0 and (#group.Children*rowHeight+(#group.Children-1)*2) or 0
+			end
+			local function render(instant)
+				local h=group.Expanded and expandedHeight() or 0
+				local info=TweenInfo.new(instant and 0 or .22,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
+				Tween(children,info,{Size=UDim2.new(1,0,0,h)}):Play()
+				Tween(holder,info,{Size=UDim2.new(1,0,0,headerHeight+h)}):Play()
+				Tween(arrow,info,{Rotation=group.Expanded and 0 or -90}):Play()
+			end
+			function group:Add(tab, name, childIcon)
+				if type(tab)~="table" or not tab.DockButton then return tab end
+				local button=tab.DockButton
+				button.Parent=children; button.AnchorPoint=Vector2.new(.5,0); button.Position=UDim2.new(.5,0,0,0)
+				button.Visible=true
+				button.Size=UDim2.new(1,-35,0,rowHeight); button.LayoutOrder=#self.Children+1
+				local padding=button:FindFirstChild("TabSwitcherUIPadding")
+				if padding then padding.PaddingLeft=UDim.new(0,36) end
+				local label=button:FindFirstChild("TabSwitcherName")
+				if label and name then label.Text=tostring(name) end
+				local image=button:FindFirstChild("TabImage")
+				if image and childIcon then MacLib:ApplyIcon(image,childIcon,Color3.fromRGB(230,231,235)) end
+				table.insert(self.Children,tab); render(true); return tab
+			end
+			function group:SetExpanded(value) self.Expanded=value==true; render(false) end
+			function group:Toggle() self:SetExpanded(not self.Expanded) end
+			header.MouseButton1Click:Connect(function() group:Toggle() end)
+			header.MouseEnter:Connect(function() Tween(header,TweenInfo.new(.14),{BackgroundTransparency=.95}):Play() end)
+			header.MouseLeave:Connect(function() Tween(header,TweenInfo.new(.14),{BackgroundTransparency=.985}):Play() end)
+			render(true)
+			return group
 		end
 
 		return SectionFunctions
@@ -8221,24 +7935,6 @@ function MacLib:Window(Settings)
 		return WindowFunctions.Compact
 	end
 
-	-- In horizontal mode the minimized launcher becomes a compact status bar.
-	-- It exposes running state, task count and menu key without occupying a
-	-- large mobile touch area.
-	if spectrumMode and openButtonContainer then
-		for _, child in ipairs(openButtonContainer:GetChildren()) do child:Destroy() end
-		openButtonContainer.Size = UDim2.fromOffset(430, 36)
-		openButtonContainer.Position = (type(Settings.OpenButton)=="table" and Settings.OpenButton.Position) or UDim2.new(.5,0,0,18)
-		local launcher=Instance.new("TextButton"); launcher.Name="StatusLauncher"; launcher.AutoButtonColor=false; launcher.BackgroundColor3=Color3.fromRGB(12,12,14); launcher.BackgroundTransparency=.12; launcher.BorderSizePixel=0; launcher.Size=UDim2.fromScale(1,1); launcher.Text=""; launcher.Parent=openButtonContainer
-		local lc=Instance.new("UICorner"); lc.CornerRadius=UDim.new(1,0); lc.Parent=launcher
-		local ls=Instance.new("UIStroke"); ls.Color=accentColor; ls.Transparency=.68; ls.Parent=launcher
-		local li=Instance.new("ImageLabel"); li.BackgroundTransparency=1; li.Position=UDim2.fromOffset(10,8); li.Size=UDim2.fromOffset(20,20); li.Parent=launcher; MacLib:ApplyIcon(li,Settings.Icon or "activity",Color3.fromRGB(240,242,246))
-		local status=Instance.new("TextLabel"); status.BackgroundTransparency=1; status.Position=UDim2.fromOffset(39,0); status.Size=UDim2.new(1,-150,1,0); status.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); status.Text=tostring((type(Settings.OpenButton)=="table" and Settings.OpenButton.Status) or "Running").."   Tasks  "..tostring((type(Settings.OpenButton)=="table" and Settings.OpenButton.Tasks) or 0); status.TextColor3=Color3.fromRGB(225,227,232); status.TextSize=10; status.TextXAlignment=Enum.TextXAlignment.Left; status.Parent=launcher
-		local key=Instance.new("TextLabel"); key.AnchorPoint=Vector2.new(1,.5); key.Position=UDim2.new(1,-12,.5,0); key.Size=UDim2.fromOffset(105,24); key.BackgroundColor3=Color3.fromRGB(255,255,255); key.BackgroundTransparency=.94; key.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); key.Text="Open   "..tostring(MenuKeybind.Name); key.TextColor3=Color3.fromRGB(205,207,213); key.TextSize=9; key.Parent=launcher; local kc=Instance.new("UICorner"); kc.CornerRadius=UDim.new(1,0); kc.Parent=key
-		launcher.MouseEnter:Connect(function() playUISound("Hover",1.1,.08,.08); Tween(launcher,TweenInfo.new(.12),{BackgroundTransparency=.06}):Play() end)
-		launcher.MouseLeave:Connect(function() Tween(launcher,TweenInfo.new(.12),{BackgroundTransparency=.12}):Play() end)
-		launcher.MouseButton1Click:Connect(function() ToggleMenu() end)
-	end
-
 	if Settings.BackgroundImage and Settings.BackgroundImage ~= "" then
 		WindowFunctions:SetBackgroundImage(Settings.BackgroundImage)
 	end
@@ -8266,11 +7962,6 @@ function MacLib:Window(Settings)
 			Name = "Notifications",
 			Default = WindowFunctions:GetNotificationsState(),
 			Callback = function(state) WindowFunctions:SetNotificationsState(state) end,
-		})
-		WindowFunctions:GlobalSetting({
-			Name = "UI Sounds",
-			Default = WindowFunctions:GetSoundsEnabled(),
-			Callback = function(state) WindowFunctions:SetSoundsEnabled(state) end,
 		})
 		WindowFunctions:GlobalSetting({
 			Name = "Acrylic Blur",
@@ -8421,64 +8112,6 @@ function MacLib:Window(Settings)
 	WindowFunctions.LockWindow = WindowFunctions.Lock
 	WindowFunctions.UnlockWindow = WindowFunctions.Unlock
 
-	-- Optional cinematic startup. It is intentionally self-contained and uses
-	-- lightweight UI shards instead of a video, so it works on mobile executors.
-	local introRunning=false
-	function WindowFunctions:PlayIntro(options)
-		if introRunning then return end
-		options=type(options)=="table" and options or {}
-		introRunning=true
-		base.Visible=false
-		local duration=math.clamp(tonumber(options.Duration or Settings.IntroDuration) or 2.8,1.2,8)
-		local overlay=Instance.new("Frame"); overlay.Name="CinematicIntro"; overlay.BackgroundColor3=options.BackgroundColor or Color3.fromRGB(3,4,8); overlay.BackgroundTransparency=tonumber(options.BackgroundTransparency) or .08; overlay.BorderSizePixel=0; overlay.Size=UDim2.fromScale(1,1); overlay.ZIndex=1200; overlay.Parent=macLib
-		local shade=Instance.new("UIGradient"); shade.Rotation=90; shade.Color=ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(4,5,10)),ColorSequenceKeypoint.new(.52,Color3.fromRGB(10,8,18)),ColorSequenceKeypoint.new(1,Color3.fromRGB(1,2,5))}); shade.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.05),NumberSequenceKeypoint.new(.5,.32),NumberSequenceKeypoint.new(1,.05)}); shade.Parent=overlay
-
-		local glow=Instance.new("Frame"); glow.AnchorPoint=Vector2.new(.5,.5); glow.Position=UDim2.fromScale(.5,.43); glow.Size=UDim2.fromOffset(280,280); glow.BackgroundColor3=options.Accent or accentColor; glow.BackgroundTransparency=.86; glow.BorderSizePixel=0; glow.ZIndex=1201; glow.Parent=overlay
-		local glowCorner=Instance.new("UICorner"); glowCorner.CornerRadius=UDim.new(1,0); glowCorner.Parent=glow
-		local glowGradient=Instance.new("UIGradient"); glowGradient.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.45),NumberSequenceKeypoint.new(1,1)}); glowGradient.Rotation=90; glowGradient.Parent=glow
-
-		local logo=Instance.new("ImageLabel"); logo.AnchorPoint=Vector2.new(.5,.5); logo.BackgroundTransparency=1; logo.Position=UDim2.fromScale(.5,.40); logo.Size=UDim2.fromOffset(0,0); logo.ScaleType=Enum.ScaleType.Fit; logo.ImageTransparency=1; logo.ZIndex=1210; logo.Parent=overlay
-		MacLib:ApplyIcon(logo,options.Logo or Settings.IntroLogo or Settings.Icon or "sparkles",options.LogoColor or Color3.fromRGB(235,225,255))
-
-		local title=Instance.new("TextLabel"); title.AnchorPoint=Vector2.new(.5,0); title.BackgroundTransparency=1; title.Position=UDim2.fromScale(.5,.57); title.Size=UDim2.new(.86,0,0,34); title.FontFace=Font.new(assets.interFont,Enum.FontWeight.Bold); title.Text=tostring(options.Title or Settings.IntroTitle or Settings.Brand or Settings.Title or "NNVN HUB"); title.TextColor3=options.TextColor or Color3.fromRGB(245,245,248); title.TextSize=tonumber(options.TitleSize) or 25; title.TextTransparency=1; title.TextXAlignment=Enum.TextXAlignment.Center; title.ZIndex=1210; title.Parent=overlay
-		local spacing=Instance.new("UIStroke"); spacing.Color=options.Accent or accentColor; spacing.Transparency=.72; spacing.Thickness=1; spacing.Parent=title
-		local subtitle=Instance.new("TextLabel"); subtitle.AnchorPoint=Vector2.new(.5,0); subtitle.BackgroundTransparency=1; subtitle.Position=UDim2.fromScale(.5,.63); subtitle.Size=UDim2.new(.9,0,0,21); subtitle.FontFace=Font.new(assets.interFont,Enum.FontWeight.Medium); subtitle.Text=tostring(options.Subtitle or Settings.IntroSubtitle or "PREMIUM AUTOMATION INTERFACE"); subtitle.TextColor3=Color3.fromRGB(255,255,255); subtitle.TextSize=10; subtitle.TextTransparency=1; subtitle.TextXAlignment=Enum.TextXAlignment.Center; subtitle.ZIndex=1210; subtitle.Parent=overlay
-		local welcome=Instance.new("TextLabel"); welcome.AnchorPoint=Vector2.new(.5,0); welcome.BackgroundTransparency=1; welcome.Position=UDim2.fromScale(.5,.69); welcome.Size=UDim2.new(.9,0,0,19); welcome.FontFace=Font.new(assets.interFont); welcome.Text=tostring(options.Welcome or ("Welcome, "..(Settings.Anonymous and (Settings.AnonymousName or "Anonymous") or LocalPlayer.DisplayName))); welcome.TextColor3=options.Accent or accentColor; welcome.TextSize=10; welcome.TextTransparency=1; welcome.TextXAlignment=Enum.TextXAlignment.Center; welcome.ZIndex=1210; welcome.Parent=overlay
-
-		-- Procedural glass cracks radiating from the logo. These are decorative and
-		-- avoid a mandatory external texture; CrackImage may still override them.
-		local crackHolder=Instance.new("Frame"); crackHolder.AnchorPoint=Vector2.new(.5,.5); crackHolder.BackgroundTransparency=1; crackHolder.Position=UDim2.fromScale(.5,.43); crackHolder.Size=UDim2.fromOffset(1,1); crackHolder.ZIndex=1206; crackHolder.Parent=overlay
-		for index=1,18 do
-			local length=math.random(70,260)
-			local line=Instance.new("Frame"); line.AnchorPoint=Vector2.new(0,.5); line.BackgroundColor3=index%3==0 and (options.Accent or accentColor) or Color3.fromRGB(225,226,245); line.BackgroundTransparency=1; line.BorderSizePixel=0; line.Position=UDim2.fromOffset(math.random(-8,8),math.random(-8,8)); line.Rotation=(index-1)*(360/18)+math.random(-8,8); line.Size=UDim2.fromOffset(0,index%4==0 and 2 or 1); line.ZIndex=1206; line.Parent=crackHolder
-			task.delay(.35+index*.012,function() if line.Parent then Tween(line,TweenInfo.new(.28,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=UDim2.fromOffset(length,line.Size.Y.Offset),BackgroundTransparency=.54}):Play() end end)
-		end
-		if options.CrackImage or Settings.IntroCrackImage then
-			local crack=Instance.new("ImageLabel"); crack.BackgroundTransparency=1; crack.Size=UDim2.fromScale(1,1); crack.ScaleType=Enum.ScaleType.Stretch; crack.Image=tostring(options.CrackImage or Settings.IntroCrackImage); crack.ImageTransparency=1; crack.ZIndex=1205; crack.Parent=overlay
-			Tween(crack,TweenInfo.new(.35),{ImageTransparency=.36}):Play()
-		end
-		for index=1,24 do
-			local shard=Instance.new("Frame"); shard.AnchorPoint=Vector2.new(.5,.5); shard.BackgroundColor3=index%2==0 and (options.Accent or accentColor) or Color3.fromRGB(235,235,245); shard.BackgroundTransparency=.22; shard.BorderSizePixel=0; shard.Position=UDim2.fromScale(.5,.43); shard.Rotation=math.random(0,180); shard.Size=UDim2.fromOffset(math.random(2,5),math.random(7,18)); shard.ZIndex=1207; shard.Parent=overlay
-			local target=UDim2.new(.5,math.random(-330,330),.43,math.random(-210,240)); task.delay(.28+math.random()*0.18,function() if shard.Parent then Tween(shard,TweenInfo.new(.72,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{Position=target,Rotation=shard.Rotation+math.random(90,260),BackgroundTransparency=1}):Play() end end)
-		end
-
-		playUISound("Open",.9,.22,0)
-		Tween(logo,TweenInfo.new(.55,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.fromOffset(132,132),ImageTransparency=0}):Play()
-		task.delay(.35,function()
-			Tween(title,TweenInfo.new(.34),{TextTransparency=0}):Play(); Tween(subtitle,TweenInfo.new(.34),{TextTransparency=.28}):Play(); Tween(welcome,TweenInfo.new(.34),{TextTransparency=.12}):Play()
-		end)
-		task.delay(duration,function()
-			if not overlay.Parent then introRunning=false return end
-			playUISound("Select",1.08,.17,0)
-			Tween(overlay,TweenInfo.new(.42,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{BackgroundTransparency=1}):Play()
-			for _,object in ipairs(overlay:GetDescendants()) do
-				if object:IsA("TextLabel") then Tween(object,TweenInfo.new(.28),{TextTransparency=1}):Play() elseif object:IsA("ImageLabel") then Tween(object,TweenInfo.new(.28),{ImageTransparency=1}):Play() elseif object:IsA("Frame") then Tween(object,TweenInfo.new(.28),{BackgroundTransparency=1}):Play() end
-			end
-			task.delay(.44,function() if overlay then overlay:Destroy() end; introRunning=false; playWindowOpen() end)
-		end)
-		return overlay
-	end
-
 	macLib.Enabled = false
 	
 	local assetList = {}
@@ -8486,16 +8119,11 @@ function MacLib:Window(Settings)
 		table.insert(assetList, assetId)
 	end
 	
-	-- Never hold the whole window hostage while Roblox fetches an optional image.
-	-- Slow/blocked CDN assets now finish in the background instead of making the
-	-- script appear frozen on executors with strict networking.
-	task.spawn(function()
-		pcall(function() ContentProvider:PreloadAsync(assetList) end)
-	end)
+	ContentProvider:PreloadAsync(assetList)
 	macLib.Enabled = true
 	windowState = true
 	if openButtonContainer then openButtonContainer.Visible = false end
-	if Settings.Intro then WindowFunctions:PlayIntro(Settings.Intro) else playWindowOpen() end
+	playWindowOpen()
 
 	return WindowFunctions
 end
@@ -9187,6 +8815,8 @@ do
 			control = patchControl(nativeDropdown(self, {
 				Name = toName(opts, "Dropdown"),
 				Options = options,
+				OptionIcons = first(opts.OptionIcons, opts.Icons),
+				OptionIconColor = opts.OptionIconColor,
 				Multi = multi,
 				-- Every dropdown is searchable by default. This keeps large NPC,
 				-- island, quest, fish, and item lists practical on PC and mobile.
@@ -9381,7 +9011,7 @@ do
 		for _, method in ipairs({
 			"Button", "Toggle", "Slider", "Input", "Dropdown", "Colorpicker", "Paragraph",
 			"AddButton", "AddToggle", "AddSlider", "AddInput", "AddDropdown", "AddColorpicker", "AddColorPicker", "AddParagraph",
-			"AddSegmented", "Segmented", "AddDivider", "AddSpacer"
+			"AddSegmented", "Segmented", "AddDivider", "AddSpacer", "AddMediaBox", "MediaBox"
 		}) do
 			if tab[method] == nil then
 				tab[method] = function(self, ...)
@@ -9456,6 +9086,9 @@ do
 			return self:Tab(opts)
 		end
 		window.CreateTab = window.CreateTab or window.AddTab
+		window.NavigationGroup = window.NavigationGroup or function(self, opts)
+			return self.__MacCompatTabGroup:NavigationGroup(opts or {})
+		end
 		window.Section = window.Section or function(self, opts)
 			opts = opts or {}
 			local group = {
@@ -9508,15 +9141,6 @@ do
 		local window = nativeWindow(self, {
 			Title = tostring(first(settings.Title, settings.Name, "MacLib")),
 			Subtitle = tostring(first(settings.Subtitle, settings.SubTitle, settings.Author, settings.Description, "")),
-			Icon = settings.Icon,
-			Layout = settings.Layout,
-			Brand = settings.Brand,
-			Version = settings.Version,
-			GameName = first(settings.GameName, settings.Game),
-			GameIcon = settings.GameIcon,
-			Language = settings.Language,
-			UserTier = first(settings.UserTier, settings.Tier),
-			ActiveUsers = settings.ActiveUsers,
 			Size = settings.Size,
 			Accent = settings.Accent,
 			DragStyle = settings.DragStyle,
@@ -9534,14 +9158,6 @@ do
 			MaxSize = settings.MaxSize,
 			ConfirmClose = settings.ConfirmClose,
 			Animations = settings.Animations,
-			Intro = settings.Intro,
-			IntroLogo = settings.IntroLogo,
-			IntroTitle = settings.IntroTitle,
-			IntroSubtitle = settings.IntroSubtitle,
-			IntroDuration = settings.IntroDuration,
-			IntroCrackImage = settings.IntroCrackImage,
-			Sounds = settings.Sounds,
-			SoundIds = settings.SoundIds,
 			NativeSettings = settings.NativeSettings,
 			DisabledWindowControls = settings.DisabledWindowControls,
 			WindowControls = settings.WindowControls,
@@ -9644,6 +9260,106 @@ do
 	MacLib.GetCurrentTheme = MacLib.GetCurrentTheme or function(self)
 		if self ~= MacLib then self = MacLib end
 		return self.__MacCompatTheme or "Dark"
+	end
+
+	-- Full-screen, reusable startup sequence. It is intentionally independent
+	-- from Window so a hub may finish its intro before constructing heavy tabs.
+	function MacLib:CreateIntro(options)
+		if self ~= MacLib then options=self; self=MacLib end
+		options=options or {}
+		local remember=tostring(options.RememberKey or "MacLib_Intro"):gsub("[^%w_%-]","")
+		local rememberFile="MacLib/"..remember..".skip"
+		if isfile and readfile then
+			local ok,value=pcall(readfile,rememberFile)
+			if ok and tostring(value)=="1" then return false end
+		end
+		local ok,result=pcall(function()
+			local TS=game:GetService("TweenService")
+			local UIS=game:GetService("UserInputService")
+			local CoreGui=game:GetService("CoreGui")
+			local parent=(gethui and gethui()) or CoreGui
+			local accent=options.Accent or Color3.fromRGB(150,110,255)
+			local duration=tonumber(options.Duration) or 3.4
+			local done=false; local rememberChoice=false; local connections={}; local fade={}
+			local function add(o) fade[#fade+1]=o; return o end
+
+			local gui=Instance.new("ScreenGui")
+			gui.Name="MacLibIntro"; gui.IgnoreGuiInset=true; gui.ResetOnSpawn=false; gui.DisplayOrder=1000000
+			if syn and syn.protect_gui then pcall(syn.protect_gui,gui) end
+			gui.Parent=parent
+			local shade=Instance.new("Frame"); shade.BackgroundColor3=Color3.new(0,0,0); shade.BackgroundTransparency=1
+			shade.BorderSizePixel=0; shade.Size=UDim2.fromScale(1,1); shade.Parent=gui
+			TS:Create(shade,TweenInfo.new(.35),{BackgroundTransparency=.14}):Play()
+
+			local center=Instance.new("Frame"); center.AnchorPoint=Vector2.new(.5,.5); center.Position=UDim2.fromScale(.5,.47)
+			center.Size=UDim2.fromOffset(360,300); center.BackgroundTransparency=1; center.Parent=shade
+			local scale=Instance.new("UIScale"); scale.Scale=.72; scale.Parent=center
+			TS:Create(scale,TweenInfo.new(.65,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{Scale=1}):Play()
+
+			local glow=add(Instance.new("ImageLabel")); glow.AnchorPoint=Vector2.new(.5,.5); glow.Position=UDim2.fromScale(.5,.39)
+			glow.Size=UDim2.fromOffset(205,205); glow.BackgroundTransparency=1; glow.Image=tostring(options.Logo or "")
+			glow.ImageColor3=accent; glow.ImageTransparency=1; glow.Parent=center
+			local logo=add(Instance.new("ImageLabel")); logo.AnchorPoint=Vector2.new(.5,.5); logo.Position=UDim2.fromScale(.5,.39)
+			logo.Size=UDim2.fromOffset(142,142); logo.BackgroundTransparency=1; logo.Image=tostring(options.Logo or "")
+			logo.ImageTransparency=1; logo.Parent=center
+			TS:Create(glow,TweenInfo.new(.8,Enum.EasingStyle.Quint),{ImageTransparency=.72,Size=UDim2.fromOffset(235,235)}):Play()
+			TS:Create(logo,TweenInfo.new(.6,Enum.EasingStyle.Quint),{ImageTransparency=0,Size=UDim2.fromOffset(158,158)}):Play()
+
+			for i=1,8 do
+				local shard=Instance.new("Frame"); shard.AnchorPoint=Vector2.new(.5,.5); shard.Position=UDim2.fromScale(.5,.39)
+				shard.Size=UDim2.fromOffset(tonumber(options.ShardLength) or 30,2); shard.Rotation=i*45
+				shard.BackgroundColor3=accent:Lerp(Color3.new(1,1,1),i%2*.55); shard.BackgroundTransparency=.15
+				shard.BorderSizePixel=0; shard.Parent=center
+				local radius=92+(i%3)*12; local a=math.rad(i*45)
+				TS:Create(shard,TweenInfo.new(.7,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{
+					Position=UDim2.new(.5,math.cos(a)*radius,.39,math.sin(a)*radius),BackgroundTransparency=1,Rotation=i*45+35
+				}):Play()
+			end
+
+			local title=add(Instance.new("TextLabel")); title.BackgroundTransparency=1; title.Position=UDim2.new(0,0,.69,0)
+			title.Size=UDim2.new(1,0,0,30); title.Font=Enum.Font.GothamBold; title.Text=tostring(options.Name or "MACLIB")
+			title.TextColor3=Color3.fromRGB(245,245,248); title.TextSize=22; title.TextTransparency=1; title.Parent=center
+			local subtitle=add(Instance.new("TextLabel")); subtitle.BackgroundTransparency=1; subtitle.Position=UDim2.new(0,0,.79,0)
+			subtitle.Size=UDim2.new(1,0,0,18); subtitle.Font=Enum.Font.GothamMedium
+			subtitle.Text=tostring(options.Subtitle or ""); subtitle.TextColor3=accent; subtitle.TextSize=11
+			subtitle.TextTransparency=1; subtitle.Parent=center
+			TS:Create(title,TweenInfo.new(.5),{TextTransparency=0}):Play(); TS:Create(subtitle,TweenInfo.new(.6),{TextTransparency=.08}):Play()
+
+			local progress=Instance.new("Frame"); progress.AnchorPoint=Vector2.new(.5,0); progress.Position=UDim2.new(.5,0,.9,0)
+			progress.Size=UDim2.fromOffset(230,2); progress.BackgroundColor3=Color3.fromRGB(55,55,62); progress.BorderSizePixel=0; progress.Parent=center
+			local fill=Instance.new("Frame"); fill.Size=UDim2.fromScale(0,1); fill.BackgroundColor3=accent; fill.BorderSizePixel=0; fill.Parent=progress
+			TS:Create(fill,TweenInfo.new(duration,Enum.EasingStyle.Linear),{Size=UDim2.fromScale(1,1)}):Play()
+
+			local bottom=Instance.new("Frame"); bottom.AnchorPoint=Vector2.new(.5,1); bottom.Position=UDim2.new(.5,0,1,-24)
+			bottom.AutomaticSize=Enum.AutomaticSize.X; bottom.Size=UDim2.fromOffset(0,28); bottom.BackgroundTransparency=1; bottom.Parent=shade
+			local flow=Instance.new("UIListLayout"); flow.FillDirection=Enum.FillDirection.Horizontal; flow.Padding=UDim.new(0,14)
+			flow.VerticalAlignment=Enum.VerticalAlignment.Center; flow.HorizontalAlignment=Enum.HorizontalAlignment.Center; flow.Parent=bottom
+			local skip=Instance.new("TextLabel"); skip.AutomaticSize=Enum.AutomaticSize.X; skip.Size=UDim2.fromOffset(0,24)
+			skip.BackgroundTransparency=1; skip.Text=tostring(options.SkipText or "Press Enter to skip"); skip.TextColor3=Color3.fromRGB(220,220,226)
+			skip.TextSize=12; skip.Font=Enum.Font.GothamMedium; skip.Parent=bottom
+			local check=Instance.new("TextButton"); check.AutoButtonColor=false; check.Size=UDim2.fromOffset(18,18); check.Text=""
+			check.BackgroundColor3=Color3.fromRGB(14,14,18); check.BorderSizePixel=0; check.Parent=bottom
+			local checkStroke=Instance.new("UIStroke"); checkStroke.Color=Color3.fromRGB(215,215,224); checkStroke.Thickness=1.2; checkStroke.Parent=check
+			local mark=Instance.new("TextLabel"); mark.Size=UDim2.fromScale(1,1); mark.BackgroundTransparency=1; mark.Text="✓"
+			mark.TextColor3=accent; mark.TextSize=14; mark.Font=Enum.Font.GothamBold; mark.Visible=false; mark.Parent=check
+			local rememberLabel=Instance.new("TextLabel"); rememberLabel.AutomaticSize=Enum.AutomaticSize.X; rememberLabel.Size=UDim2.fromOffset(0,24)
+			rememberLabel.BackgroundTransparency=1; rememberLabel.Text="Don't show again"; rememberLabel.TextColor3=Color3.fromRGB(220,220,226)
+			rememberLabel.TextSize=12; rememberLabel.Font=Enum.Font.GothamMedium; rememberLabel.Parent=bottom
+			connections[#connections+1]=check.MouseButton1Click:Connect(function() rememberChoice=not rememberChoice; mark.Visible=rememberChoice; checkStroke.Color=rememberChoice and accent or Color3.fromRGB(215,215,224) end)
+			connections[#connections+1]=UIS.InputBegan:Connect(function(input,processed) if not processed and input.KeyCode==Enum.KeyCode.Return then done=true end end)
+
+			local started=os.clock(); repeat task.wait(.03) until done or os.clock()-started>=duration
+			if rememberChoice and writefile then pcall(function() if makefolder then pcall(makefolder,"MacLib") end; writefile(rememberFile,"1") end) end
+			for _,connection in ipairs(connections) do connection:Disconnect() end
+			TS:Create(shade,TweenInfo.new(.35),{BackgroundTransparency=1}):Play()
+			for _,object in ipairs(fade) do
+				if object:IsA("ImageLabel") then TS:Create(object,TweenInfo.new(.28),{ImageTransparency=1}):Play()
+				elseif object:IsA("TextLabel") then TS:Create(object,TweenInfo.new(.28),{TextTransparency=1}):Play() end
+			end
+			task.wait(.38); gui:Destroy(); return true
+		end)
+		if not ok then warn("[MacLib Intro] "..tostring(result)); return false end
+		return result
 	end
 end
 
