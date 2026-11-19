@@ -568,7 +568,7 @@ function MacLib:Window(Settings)
 	headerIconGhost.AnchorPoint = Vector2.new(0, 0.5)
 	headerIconGhost.BackgroundTransparency = 1
 	headerIconGhost.BorderSizePixel = 0
-	headerIconGhost.Position = UDim2.new(0, -12, 0.5, -5)
+	headerIconGhost.Position = UDim2.new(0, -12, 0.5, -11)
 	headerIconGhost.Rotation = -7
 	headerIconGhost.Size = UDim2.fromOffset(72, 72)
 	headerIconGhost.ScaleType = Enum.ScaleType.Fit
@@ -581,7 +581,7 @@ function MacLib:Window(Settings)
 	headerIcon.AnchorPoint = Vector2.new(0, 0.5)
 	headerIcon.BackgroundTransparency = 1
 	headerIcon.BorderSizePixel = 0
-	headerIcon.Position = UDim2.new(0, 0, 0.5, 0)
+	headerIcon.Position = UDim2.new(0, 0, 0.5, -6)
 	headerIcon.Size = UDim2.fromOffset(58, 58)
 	headerIcon.ScaleType = Enum.ScaleType.Fit
 	headerIcon.Visible = hasHeaderIcon
@@ -832,7 +832,7 @@ function MacLib:Window(Settings)
 			sidebarGroup.Position = UDim2.fromOffset(0, 115)
 			sidebarGroup.Size = UDim2.new(1, 0, 1, -115)
 			titleFrame.Size = UDim2.new(1, -headerIconOffset, 0, 42)
-			headerIcon.Position = UDim2.fromOffset(0, 21)
+			headerIcon.Position = UDim2.fromOffset(0, 15)
 			tagRail.Position = UDim2.fromOffset(0, 44)
 			tagRail.Size = UDim2.fromOffset(math.min(86, math.max(64, contentWidth - 21)), 24)
 		else
@@ -840,7 +840,7 @@ function MacLib:Window(Settings)
 			sidebarGroup.Position = UDim2.fromOffset(0, 91)
 			sidebarGroup.Size = UDim2.new(1, 0, 1, -91)
 			titleFrame.Size = UDim2.new(1, -headerIconOffset, 1, 0)
-			headerIcon.Position = UDim2.new(0, 0, 0.5, 0)
+			headerIcon.Position = UDim2.new(0, 0, 0.5, -6)
 			local width = math.clamp(contentWidth - wantedX - 21, 62, 84)
 			tagRail.Position = UDim2.fromOffset(wantedX, 2)
 			tagRail.Size = UDim2.fromOffset(width + 2, 24)
@@ -8061,23 +8061,23 @@ function MacLib:Window(Settings)
 		local profile = Instance.new("CanvasGroup")
 		profile.Name = "ProfileMenu"
 		profile.AnchorPoint = Vector2.new(0, 1)
-		profile.BackgroundColor3 = Color3.fromRGB(3, 5, 8)
-		profile.BackgroundTransparency = 0.24
+		profile.BackgroundColor3 = Color3.fromRGB(7, 8, 10)
+		profile.BackgroundTransparency = 0.48
 		profile.BorderSizePixel = 0
 		profile.Position = UDim2.new(0, 10, 1, -62)
 		profile.Size = UDim2.fromOffset(226, 334)
 		profile.Visible = false
 		profile.ZIndex = 310
 		profile.Parent = base
-		local profileCorner = Instance.new("UICorner"); profileCorner.CornerRadius = UDim.new(0, 11); profileCorner.Parent = profile
-		local profileStroke = Instance.new("UIStroke"); profileStroke.Color = Color3.fromRGB(214,218,226); profileStroke.Transparency = 0.62; profileStroke.Thickness = 1; profileStroke.Parent = profile
+		local profileCorner = Instance.new("UICorner"); profileCorner.CornerRadius = UDim.new(0, 4); profileCorner.Parent = profile
+		local profileStroke = Instance.new("UIStroke"); profileStroke.Color = Color3.fromRGB(214,218,226); profileStroke.Transparency = 0.8; profileStroke.Thickness = 1; profileStroke.Parent = profile
 		registerAccent(function(color) profileStroke.Color = color end)
 		local profileScale=Instance.new("UIScale"); profileScale.Scale=.94; profileScale.Parent=profile
 
 		local avatar = Instance.new("ImageLabel")
 		avatar.BackgroundTransparency = 1; avatar.Position = UDim2.fromOffset(13, 12); avatar.Size = UDim2.fromOffset(38, 38)
 		avatar.Image = headshot.Image; avatar.ZIndex = 312; avatar.Parent = profile
-		local avatarCorner = Instance.new("UICorner"); avatarCorner.CornerRadius = UDim.new(1, 0); avatarCorner.Parent = avatar
+		local avatarCorner = Instance.new("UICorner"); avatarCorner.CornerRadius = UDim.new(0, 4); avatarCorner.Parent = avatar
 		local profileName = Instance.new("TextLabel")
 		profileName.BackgroundTransparency = 1; profileName.Position = UDim2.fromOffset(60, 12); profileName.Size = UDim2.new(1, -72, 0, 20)
 		profileName.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold); profileName.Text = displayName.Text; profileName.TextColor3 = Color3.fromRGB(242, 242, 245); profileName.TextSize = 12; profileName.TextXAlignment = Enum.TextXAlignment.Left; profileName.ZIndex = 312; profileName.Parent = profile
@@ -8090,15 +8090,15 @@ function MacLib:Window(Settings)
 		local rowButtons = {}
 		local function row(iconName, titleText, valueText, callback, danger)
 			local button = Instance.new("TextButton")
-			button.AutoButtonColor=false; button.BackgroundColor3=Color3.fromRGB(20,22,27); button.BackgroundTransparency=.38; button.BorderSizePixel=0
+			button.AutoButtonColor=false; button.BackgroundColor3=Color3.fromRGB(8,9,12); button.BackgroundTransparency=.62; button.BorderSizePixel=0
 			button.Position=UDim2.fromOffset(10,rowY); button.Size=UDim2.new(1,-20,0,32); button.Text=""; button.ZIndex=312; button.Parent=profile
-			local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,7); corner.Parent=button
+			local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,3); corner.Parent=button
 			local icon=Instance.new("ImageLabel"); icon.BackgroundTransparency=1; icon.Position=UDim2.fromOffset(9,8); icon.Size=UDim2.fromOffset(16,16); icon.ZIndex=313; icon.Parent=button; MacLib:ApplyIcon(icon,iconName,danger and Color3.fromRGB(241,91,91) or Color3.fromRGB(190,193,201))
 			local label=Instance.new("TextLabel"); label.BackgroundTransparency=1; label.Position=UDim2.fromOffset(34,0); label.Size=UDim2.new(.52,-34,1,0); label.FontFace=Font.new(assets.interFont); label.Text=titleText; label.TextColor3=danger and Color3.fromRGB(241,91,91) or Color3.fromRGB(225,226,230); label.TextSize=10; label.TextXAlignment=Enum.TextXAlignment.Left; label.ZIndex=313; label.Parent=button
 			local value=Instance.new("TextLabel"); value.BackgroundTransparency=1; value.Position=UDim2.new(.52,0,0,0); value.Size=UDim2.new(.48,-20,1,0); value.FontFace=Font.new(assets.interFont); value.Text=tostring(valueText or ""); value.TextColor3=danger and Color3.fromRGB(241,91,91) or Color3.fromRGB(165,168,176); value.TextSize=9; value.TextXAlignment=Enum.TextXAlignment.Right; value.ZIndex=313; value.Parent=button
 			if not danger then local arrow=Instance.new("TextLabel"); arrow.BackgroundTransparency=1; arrow.Position=UDim2.new(1,-17,0,0); arrow.Size=UDim2.fromOffset(12,32); arrow.FontFace=Font.new(assets.interFont); arrow.Text=">"; arrow.TextColor3=Color3.fromRGB(125,128,136); arrow.TextSize=12; arrow.ZIndex=313; arrow.Parent=button end
-			button.MouseEnter:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.16}):Play() end)
-			button.MouseLeave:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.38}):Play() end)
+			button.MouseEnter:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.46}):Play() end)
+			button.MouseLeave:Connect(function() Tween(button,TweenInfo.new(.12),{BackgroundTransparency=.62}):Play() end)
 			button.MouseButton1Click:Connect(function() if callback then callback(value) end end)
 			rowButtons[#rowButtons+1]=button
 			rowY = rowY + 36
@@ -8108,14 +8108,14 @@ function MacLib:Window(Settings)
 		local function openChoice(titleText, choices, selected, apply)
 			local old=profile:FindFirstChild("ChoicePanel"); if old then old:Destroy() end
 			for _,button in ipairs(rowButtons) do button.Visible=false end
-			local panel=Instance.new("CanvasGroup"); panel.Name="ChoicePanel"; panel.BackgroundColor3=Color3.fromRGB(5,7,11); panel.BackgroundTransparency=.12
+			local panel=Instance.new("CanvasGroup"); panel.Name="ChoicePanel"; panel.BackgroundColor3=Color3.fromRGB(7,8,10); panel.BackgroundTransparency=.44
 			panel.Position=UDim2.fromOffset(8,64); panel.Size=UDim2.new(1,-16,1,-72); panel.GroupTransparency=1; panel.ZIndex=320; panel.Parent=profile
-			local panelCorner=Instance.new("UICorner"); panelCorner.CornerRadius=UDim.new(0,9); panelCorner.Parent=panel
-			local panelStroke=Instance.new("UIStroke"); panelStroke.Color=Color3.fromRGB(230,232,238); panelStroke.Transparency=.78; panelStroke.Parent=panel
+			local panelCorner=Instance.new("UICorner"); panelCorner.CornerRadius=UDim.new(0,4); panelCorner.Parent=panel
+			local panelStroke=Instance.new("UIStroke"); panelStroke.Color=Color3.fromRGB(230,232,238); panelStroke.Transparency=.84; panelStroke.Parent=panel
 			local panelScale=Instance.new("UIScale"); panelScale.Scale=.96; panelScale.Parent=panel
 			local header=Instance.new("TextLabel"); header.BackgroundTransparency=1; header.Position=UDim2.fromOffset(12,8); header.Size=UDim2.new(1,-48,0,24); header.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); header.Text=titleText; header.TextSize=11; header.TextColor3=Color3.fromRGB(243,244,247); header.TextXAlignment=Enum.TextXAlignment.Left; header.ZIndex=322; header.Parent=panel
 			local back=Instance.new("TextButton"); back.AutoButtonColor=false; back.BackgroundColor3=Color3.fromRGB(255,255,255); back.BackgroundTransparency=.91; back.Position=UDim2.new(1,-38,0,7); back.Size=UDim2.fromOffset(28,26); back.Text="<"; back.TextColor3=Color3.fromRGB(235,237,242); back.TextSize=13; back.ZIndex=322; back.Parent=panel
-			local backCorner=Instance.new("UICorner"); backCorner.CornerRadius=UDim.new(0,6); backCorner.Parent=back
+			local backCorner=Instance.new("UICorner"); backCorner.CornerRadius=UDim.new(0,3); backCorner.Parent=back
 			local list=Instance.new("ScrollingFrame"); list.BackgroundTransparency=1; list.BorderSizePixel=0; list.Position=UDim2.fromOffset(8,40); list.Size=UDim2.new(1,-16,1,-48); list.ScrollBarThickness=2; list.AutomaticCanvasSize=Enum.AutomaticSize.Y; list.CanvasSize=UDim2.new(); list.ZIndex=321; list.Parent=panel
 			local layout=Instance.new("UIListLayout"); layout.Padding=UDim.new(0,6); layout.Parent=list
 			local function closeChoice()
@@ -8125,10 +8125,10 @@ function MacLib:Window(Settings)
 			back.MouseButton1Click:Connect(closeChoice)
 			for _,choice in ipairs(choices) do
 				local name=tostring(choice.Name or choice[1] or choice)
-				local option=Instance.new("TextButton"); option.AutoButtonColor=false; option.BackgroundColor3=choice.Color or Color3.fromRGB(24,27,33); option.BackgroundTransparency=choice.Color and .62 or .32; option.Size=UDim2.new(1,-2,0,36); option.Text=""; option.ZIndex=322; option.Parent=list
-				local oc=Instance.new("UICorner"); oc.CornerRadius=UDim.new(0,7); oc.Parent=option
+				local option=Instance.new("TextButton"); option.AutoButtonColor=false; option.BackgroundColor3=Color3.fromRGB(12,14,17); option.BackgroundTransparency=.5; option.Size=UDim2.new(1,-2,0,36); option.Text=""; option.ZIndex=322; option.Parent=list
+				local oc=Instance.new("UICorner"); oc.CornerRadius=UDim.new(0,3); oc.Parent=option
 				local os=Instance.new("UIStroke"); os.Color=(name==selected) and accentColor or Color3.fromRGB(255,255,255); os.Transparency=(name==selected) and .32 or .9; os.Parent=option
-				if choice.Color then local swatch=Instance.new("Frame"); swatch.BackgroundColor3=choice.Color; swatch.Position=UDim2.fromOffset(9,9); swatch.Size=UDim2.fromOffset(18,18); swatch.ZIndex=323; swatch.Parent=option; local sc=Instance.new("UICorner"); sc.CornerRadius=UDim.new(1,0); sc.Parent=swatch end
+				if choice.Color then local swatch=Instance.new("Frame"); swatch.BackgroundColor3=choice.Color; swatch.Position=UDim2.fromOffset(9,9); swatch.Size=UDim2.fromOffset(18,18); swatch.ZIndex=323; swatch.Parent=option; local sc=Instance.new("UICorner"); sc.CornerRadius=UDim.new(0,2); sc.Parent=swatch end
 				local textLabel=Instance.new("TextLabel"); textLabel.BackgroundTransparency=1; textLabel.Position=UDim2.fromOffset(choice.Color and 36 or 11,0); textLabel.Size=UDim2.new(1,choice.Color and -70 or -45,1,0); textLabel.FontFace=Font.new(assets.interFont); textLabel.Text=name; textLabel.TextColor3=Color3.fromRGB(235,236,240); textLabel.TextSize=10; textLabel.TextXAlignment=Enum.TextXAlignment.Left; textLabel.ZIndex=323; textLabel.Parent=option
 				local mark=Instance.new("TextLabel"); mark.BackgroundTransparency=1; mark.Position=UDim2.new(1,-30,0,0); mark.Size=UDim2.fromOffset(22,36); mark.Text=name==selected and "v" or ""; mark.TextColor3=Color3.fromRGB(236,238,243); mark.TextSize=11; mark.ZIndex=323; mark.Parent=option
 				option.MouseButton1Click:Connect(function() apply(choice,name); closeChoice() end)
