@@ -7437,9 +7437,11 @@ function MacLib:Window(Settings)
 		if openSettings ~= false then
 			if type(openSettings) ~= "table" then openSettings = {} end
 			local openStyle = string.lower(tostring(openSettings.Style or "Graph"))
+			local isStatusBar = openStyle == "statusbar" or openStyle == "telemetry"
 			openButtonEnabled = openSettings.Enabled ~= false
 			local openColor = openSettings.Color or Color3.fromRGB(225, 227, 232)
-			local openButtonSize = openSettings.Size or ((openStyle == "statusbar" or openStyle == "telemetry") and UDim2.fromOffset(520, 42) or UDim2.fromOffset(96, 30))
+			local openButtonSize = openSettings.Size or (isStatusBar and UDim2.fromOffset(420, 42) or UDim2.fromOffset(96, 30))
+			local collapsedOpenSize = isStatusBar and UDim2.fromOffset(42, 42) or openButtonSize
 			local bounceHeight = tonumber(openSettings.BounceHeight) or 3
 			local bounceSpeed = math.max(tonumber(openSettings.BounceSpeed) or 1.05, 0.25)
 			local pulseSpeed = math.max(tonumber(openSettings.PulseSpeed) or 1.45, 0.4)
@@ -7450,7 +7452,7 @@ function MacLib:Window(Settings)
 			openButtonContainer.AnchorPoint = Vector2.new(0.5, 0)
 			openButtonContainer.BackgroundTransparency = 1
 			openButtonContainer.Position = openSettings.Position or UDim2.new(0.5, 0, 0, 18)
-			openButtonContainer.Size = openButtonSize
+			openButtonContainer.Size = collapsedOpenSize
 			openButtonContainer.Visible = false
 			openButtonContainer.ZIndex = 250
 			openButtonContainer.Parent = macLib
@@ -7459,6 +7461,7 @@ function MacLib:Window(Settings)
 			motion.Name = "PingMotion"
 			motion.BackgroundTransparency = 1
 			motion.Size = UDim2.fromScale(1, 1)
+			motion.ClipsDescendants = false
 			motion.ZIndex = 250
 			motion.Parent = openButtonContainer
 
@@ -7472,6 +7475,7 @@ function MacLib:Window(Settings)
 			pulseRing.Size = UDim2.new(1, 6, 1, 6)
 			pulseRing.ZIndex = 249
 			pulseRing.Parent = motion
+			pulseRing.Visible = not isStatusBar
 			local pulseCorner = Instance.new("UICorner")
 			pulseCorner.CornerRadius = UDim.new(1, 0)
 			pulseCorner.Parent = pulseRing
@@ -7486,6 +7490,7 @@ function MacLib:Window(Settings)
 			glow.Size = UDim2.new(1, 10, 1, 10)
 			glow.ZIndex = 250
 			glow.Parent = motion
+			glow.Visible = not isStatusBar
 			local glowCorner = Instance.new("UICorner")
 			glowCorner.CornerRadius = UDim.new(1, 0)
 			glowCorner.Parent = glow
@@ -7499,6 +7504,7 @@ function MacLib:Window(Settings)
 			launcher.FontFace = Font.new(assets.interFont, Enum.FontWeight.SemiBold, Enum.FontStyle.Normal)
 			launcher.Position = UDim2.fromOffset(0, 0)
 			launcher.Size = UDim2.fromScale(1, 1)
+			launcher.ClipsDescendants = true
 			launcher.Text = ""
 			launcher.TextColor3 = Color3.fromRGB(245, 245, 245)
 			launcher.TextSize = 12
@@ -7523,8 +7529,9 @@ function MacLib:Window(Settings)
 			chart.ZIndex = 253
 			chart.Parent = launcher
 			local getPlayerPing
+			local statusDetails = {}
 
-			if openStyle == "statusbar" or openStyle == "telemetry" then
+			if isStatusBar then
 				chart.Visible = false
 				launcherCorner.CornerRadius = UDim.new(0, 7)
 				local logo = Instance.new("ImageLabel")
@@ -7532,27 +7539,16 @@ function MacLib:Window(Settings)
 				logo.Position = UDim2.fromOffset(5, 4); logo.Size = UDim2.fromOffset(34, 34); logo.ScaleType = Enum.ScaleType.Fit
 				logo.Image = tostring(openSettings.Logo or Settings.Icon or ""); logo.ZIndex = 256; logo.Parent = launcher
 				local logoCorner = Instance.new("UICorner"); logoCorner.CornerRadius = UDim.new(0, 5); logoCorner.Parent = logo
-				local modeIcon = Instance.new("ImageLabel"); modeIcon.BackgroundTransparency=1; modeIcon.Position=UDim2.fromOffset(49,12); modeIcon.Size=UDim2.fromOffset(16,16); modeIcon.ZIndex=256; modeIcon.Parent=launcher; MacLib:ApplyIcon(modeIcon,"activity",openColor)
-				local primary = Instance.new("TextLabel"); primary.BackgroundTransparency=1; primary.Position=UDim2.fromOffset(70,5); primary.Size=UDim2.fromOffset(230,17); primary.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); primary.TextSize=10; primary.TextColor3=Color3.fromRGB(235,240,246); primary.TextXAlignment=Enum.TextXAlignment.Left; primary.Text="NNVN Hub"; primary.ZIndex=256; primary.Parent=launcher
-				local secondary = Instance.new("TextLabel"); secondary.BackgroundTransparency=1; secondary.Position=UDim2.fromOffset(70,21); secondary.Size=UDim2.fromOffset(230,15); secondary.FontFace=Font.new(assets.interFont); secondary.TextSize=9; secondary.TextColor3=openColor; secondary.TextXAlignment=Enum.TextXAlignment.Left; secondary.Text="Ready"; secondary.ZIndex=256; secondary.Parent=launcher
-				local keyBox=Instance.new("Frame"); keyBox.BackgroundColor3=Color3.fromRGB(12,15,20); keyBox.BackgroundTransparency=.12; keyBox.Position=UDim2.new(1,-205,0,4); keyBox.Size=UDim2.fromOffset(100,34); keyBox.ZIndex=256; keyBox.Parent=launcher; local keyCorner=Instance.new("UICorner"); keyCorner.CornerRadius=UDim.new(0,5); keyCorner.Parent=keyBox
-				local keyTitle=Instance.new("TextLabel"); keyTitle.BackgroundTransparency=1; keyTitle.Position=UDim2.fromOffset(6,2); keyTitle.Size=UDim2.new(1,-12,0,12); keyTitle.FontFace=Font.new(assets.interFont); keyTitle.TextSize=8; keyTitle.TextColor3=openColor; keyTitle.Text="OPEN"; keyTitle.TextXAlignment=Enum.TextXAlignment.Left; keyTitle.ZIndex=257; keyTitle.Parent=keyBox
-				local keyValue=Instance.new("TextLabel"); keyValue.BackgroundTransparency=1; keyValue.Position=UDim2.fromOffset(6,14); keyValue.Size=UDim2.new(1,-12,0,16); keyValue.FontFace=Font.new(assets.interFont,Enum.FontWeight.SemiBold); keyValue.TextSize=9; keyValue.TextColor3=Color3.fromRGB(240,240,240); keyValue.Text=tostring(MenuKeybind.Name):upper(); keyValue.TextXAlignment=Enum.TextXAlignment.Left; keyValue.ZIndex=257; keyValue.Parent=keyBox
-
-				local pinned=false
-				local launcherLocked=false
-				local function actionButton(offset, iconName, callback)
-					local button=Instance.new("ImageButton"); button.AutoButtonColor=false; button.BackgroundColor3=Color3.fromRGB(12,15,20); button.BackgroundTransparency=.1; button.Position=UDim2.new(1,offset,0,4); button.Size=UDim2.fromOffset(30,34); button.ZIndex=260; button.Parent=motion
-					local corner=Instance.new("UICorner"); corner.CornerRadius=UDim.new(0,5); corner.Parent=button; MacLib:ApplyIcon(button,iconName,openColor)
-					button.MouseButton1Click:Connect(callback); return button
-				end
-				local lockButton
-				lockButton=actionButton(-99,"lock",function()
-					launcherLocked=not launcherLocked
-					MacLib:ApplyIcon(lockButton,launcherLocked and "lock-keyhole" or "lock-keyhole-open",openColor)
-				end)
-				actionButton(-65,"pin",function() pinned=not pinned; openButtonContainer.Position=pinned and UDim2.new(.5,0,0,8) or (openSettings.Position or UDim2.new(.5,0,0,18)) end)
-				actionButton(-31,"monitor",ToggleMenu)
+				local logoStroke=Instance.new("UIStroke"); logoStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; logoStroke.Color=openColor; logoStroke.Transparency=.42; logoStroke.Thickness=1; logoStroke.Parent=logo
+				local divider=Instance.new("Frame"); divider.BackgroundColor3=openColor; divider.BackgroundTransparency=.58; divider.BorderSizePixel=0; divider.Position=UDim2.fromOffset(47,7); divider.Size=UDim2.fromOffset(1,28); divider.ZIndex=256; divider.Visible=false; divider.Parent=launcher
+				local modeIcon = Instance.new("ImageLabel"); modeIcon.BackgroundTransparency=1; modeIcon.Position=UDim2.fromOffset(57,13); modeIcon.Size=UDim2.fromOffset(15,15); modeIcon.ZIndex=256; modeIcon.Visible=false; modeIcon.Parent=launcher; MacLib:ApplyIcon(modeIcon,"activity",openColor)
+				local primary = Instance.new("TextLabel"); primary.BackgroundTransparency=1; primary.Position=UDim2.fromOffset(80,5); primary.Size=UDim2.new(1,-198,0,17); primary.FontFace=Font.fromEnum(Enum.Font.Code); primary.TextSize=10; primary.TextColor3=Color3.fromRGB(235,240,246); primary.TextXAlignment=Enum.TextXAlignment.Left; primary.TextTruncate=Enum.TextTruncate.AtEnd; primary.Text="NNVN HUB"; primary.Visible=false; primary.ZIndex=256; primary.Parent=launcher
+				local secondary = Instance.new("TextLabel"); secondary.BackgroundTransparency=1; secondary.Position=UDim2.fromOffset(80,21); secondary.Size=UDim2.new(1,-198,0,15); secondary.FontFace=Font.fromEnum(Enum.Font.Code); secondary.TextSize=9; secondary.TextColor3=openColor; secondary.TextXAlignment=Enum.TextXAlignment.Left; secondary.TextTruncate=Enum.TextTruncate.AtEnd; secondary.Text="READY"; secondary.Visible=false; secondary.ZIndex=256; secondary.Parent=launcher
+				local keyBox=Instance.new("Frame"); keyBox.BackgroundColor3=Color3.fromRGB(12,15,20); keyBox.BackgroundTransparency=.12; keyBox.Position=UDim2.new(1,-108,0,4); keyBox.Size=UDim2.fromOffset(103,34); keyBox.Visible=false; keyBox.ZIndex=256; keyBox.Parent=launcher; local keyCorner=Instance.new("UICorner"); keyCorner.CornerRadius=UDim.new(0,5); keyCorner.Parent=keyBox
+				local keyStroke=Instance.new("UIStroke"); keyStroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border; keyStroke.Color=openColor; keyStroke.Transparency=.58; keyStroke.Thickness=1; keyStroke.Parent=keyBox
+				local keyTitle=Instance.new("TextLabel"); keyTitle.BackgroundTransparency=1; keyTitle.Position=UDim2.fromOffset(7,2); keyTitle.Size=UDim2.new(1,-14,0,12); keyTitle.FontFace=Font.fromEnum(Enum.Font.Code); keyTitle.TextSize=8; keyTitle.TextColor3=openColor; keyTitle.Text="OPEN"; keyTitle.TextXAlignment=Enum.TextXAlignment.Left; keyTitle.ZIndex=257; keyTitle.Parent=keyBox
+				local keyValue=Instance.new("TextLabel"); keyValue.BackgroundTransparency=1; keyValue.Position=UDim2.fromOffset(7,14); keyValue.Size=UDim2.new(1,-14,0,16); keyValue.FontFace=Font.fromEnum(Enum.Font.Code); keyValue.TextSize=9; keyValue.TextColor3=Color3.fromRGB(240,240,240); keyValue.Text=tostring(MenuKeybind.Name):upper(); keyValue.TextXAlignment=Enum.TextXAlignment.Left; keyValue.ZIndex=257; keyValue.Parent=keyBox
+				statusDetails={divider,modeIcon,primary,secondary,keyBox}
 
 				task.spawn(function()
 					local frameCount,lastCount,lastSample=0,0,os.clock(); local fps=0; local connection=RunService.RenderStepped:Connect(function() frameCount=frameCount+1 end); local mode=0
@@ -7665,34 +7661,51 @@ function MacLib:Window(Settings)
 			pinTip.Rotation = 45
 			pinTip.Size = UDim2.fromOffset(7, 7)
 			pinTip.ZIndex = 251
-			pinTip.Visible = openSettings.PinTip == true
+			pinTip.Visible = not isStatusBar and openSettings.PinTip == true
 			pinTip.Parent = motion
 			local pinTipCorner = Instance.new("UICorner")
 			pinTipCorner.CornerRadius = UDim.new(0, 2)
 			pinTipCorner.Parent = pinTip
 
-			task.spawn(function()
-				while chart.Parent and macLib.Parent do
-					local ping = getPlayerPing()
-					table.remove(pingSamples, 1)
-					table.insert(pingSamples, ping)
-					local pingColor = colorForPing(ping)
-					renderPingChart(pingColor)
-					launcherStroke.Color = pingColor
-					pinTip.BackgroundColor3 = pingColor
-					task.wait(math.max(tonumber(openSettings.UpdateRate) or 0.8, 0.25))
-				end
-			end)
-			chart:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-				renderPingChart(colorForPing(pingSamples[#pingSamples] or 0))
-			end)
+			-- The compact status launcher does not render the graph. Avoid keeping an
+			-- invisible chart loop alive; its expanded text samples ping independently.
+			if not isStatusBar then
+				task.spawn(function()
+					while chart.Parent and macLib.Parent do
+						local ping = getPlayerPing()
+						table.remove(pingSamples, 1)
+						table.insert(pingSamples, ping)
+						local pingColor = colorForPing(ping)
+						renderPingChart(pingColor)
+						launcherStroke.Color = pingColor
+						pinTip.BackgroundColor3 = pingColor
+						task.wait(math.max(tonumber(openSettings.UpdateRate) or 0.8, 0.25))
+					end
+				end)
+				chart:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+					renderPingChart(colorForPing(pingSamples[#pingSamples] or 0))
+				end)
+			end
 
 			launcher.MouseEnter:Connect(function()
+				if isStatusBar then
+					for _, object in ipairs(statusDetails) do object.Visible = true end
+					Tween(openButtonContainer, TweenInfo.new(.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size=openButtonSize}):Play()
+				end
 				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0 }):Play()
 				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.18 }):Play()
 				Tween(glow, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.79 }):Play()
 			end)
 			launcher.MouseLeave:Connect(function()
+				if isStatusBar then
+					local collapse=Tween(openButtonContainer, TweenInfo.new(.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size=collapsedOpenSize})
+					collapse.Completed:Connect(function(playbackState)
+						if playbackState == Enum.PlaybackState.Completed then
+							for _, object in ipairs(statusDetails) do object.Visible = false end
+						end
+					end)
+					collapse:Play()
+				end
 				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.08 }):Play()
 				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.48 }):Play()
 				Tween(glow, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.88 }):Play()
@@ -7705,7 +7718,6 @@ function MacLib:Window(Settings)
 			local moved = false
 			if openSettings.Draggable ~= false then
 				launcher.InputBegan:Connect(function(input)
-					if launcherLocked then return end
 					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						dragging = true
 						moved = false
@@ -7745,7 +7757,7 @@ function MacLib:Window(Settings)
 				end)
 			end
 
-			if openSettings.Pulse ~= false then
+			if openSettings.Pulse ~= false and not isStatusBar then
 				task.spawn(function()
 					while pulseRing.Parent and macLib.Parent do
 						pulseRing.Size = UDim2.new(1, 4, 1, 4)
@@ -7777,7 +7789,10 @@ function MacLib:Window(Settings)
 				if config.DynamicColor ~= nil then dynamicPingColor = config.DynamicColor == true end
 				if config.CornerRadius ~= nil and typeof(config.CornerRadius) == "UDim" then launcherCorner.CornerRadius = config.CornerRadius end
 				if config.StrokeThickness ~= nil then launcherStroke.Thickness = math.max(tonumber(config.StrokeThickness) or 1, 0) end
-				if config.Size ~= nil and typeof(config.Size) == "UDim2" then openButtonContainer.Size = config.Size end
+				if config.Size ~= nil and typeof(config.Size) == "UDim2" then
+					openButtonSize = config.Size
+					openButtonContainer.Size = isStatusBar and collapsedOpenSize or config.Size
+				end
 				if config.BounceHeight ~= nil then bounceHeight = math.max(tonumber(config.BounceHeight) or bounceHeight, 0) end
 				if config.BounceSpeed ~= nil then bounceSpeed = math.max(tonumber(config.BounceSpeed) or bounceSpeed, 0.25) end
 				if config.PulseSpeed ~= nil then pulseSpeed = math.max(tonumber(config.PulseSpeed) or pulseSpeed, 0.4) end
