@@ -557,13 +557,33 @@ function MacLib:Window(Settings)
 		ChangeGlobalSettingsButtonState("Default")
 	end)
 
+	-- Optional window logo shown before the title. CreateWindow already accepts
+	-- `Icon`; render it here as well instead of limiting it to tabs/launchers.
+	local hasHeaderIcon = Settings.Icon ~= nil and tostring(Settings.Icon) ~= ""
+	local headerIconOffset = hasHeaderIcon and 36 or 0
+	local headerIcon = Instance.new("ImageLabel")
+	headerIcon.Name = "HeaderIcon"
+	headerIcon.AnchorPoint = Vector2.new(0, 0.5)
+	headerIcon.BackgroundTransparency = 1
+	headerIcon.BorderSizePixel = 0
+	headerIcon.Position = UDim2.new(0, 0, 0.5, 0)
+	headerIcon.Size = UDim2.fromOffset(28, 28)
+	headerIcon.ScaleType = Enum.ScaleType.Fit
+	headerIcon.Visible = hasHeaderIcon
+	headerIcon.ZIndex = 3
+	headerIcon.Parent = informationHolder
+	if hasHeaderIcon then
+		MacLib:ApplyIcon(headerIcon, Settings.Icon, Settings.IconColor or Color3.fromRGB(238, 240, 244))
+	end
+
 	local titleFrame = Instance.new("Frame")
 	titleFrame.Name = "TitleFrame"
 	titleFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	titleFrame.BackgroundTransparency = 1
 	titleFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	titleFrame.BorderSizePixel = 0
-	titleFrame.Size = UDim2.fromScale(1, 1)
+	titleFrame.Position = UDim2.fromOffset(headerIconOffset, 0)
+	titleFrame.Size = UDim2.new(1, -headerIconOffset, 1, 0)
 
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
@@ -781,13 +801,13 @@ function MacLib:Window(Settings)
 	tagRail.Size = UDim2.fromOffset(76, 27)
 	tagRail.ScrollingDirection = Enum.ScrollingDirection.X
 	tagRail.Parent = informationHolder
-	titleFrame.Size = UDim2.fromScale(1, 1)
+	titleFrame.Size = UDim2.new(1, -headerIconOffset, 1, 0)
 
 	local function updateHeaderTagLayout()
 		-- The holder has 23px left and 22px right padding. Keep another 21px on
 		-- the right for the bell and globe/settings buttons.
 		local contentWidth = math.max(0, informationHolder.AbsoluteSize.X - 45)
-		local wantedX = math.max(0, math.ceil(title.TextBounds.X) + 11)
+		local wantedX = math.max(0, headerIconOffset + math.ceil(title.TextBounds.X) + 11)
 		local narrowHeader = wantedX + 62 + 21 > contentWidth
 		if narrowHeader then
 			-- Mobile/narrow sidebar: give the tag its own row instead of moving it
@@ -795,14 +815,16 @@ function MacLib:Window(Settings)
 			information.Size = UDim2.new(1, 0, 0, 84)
 			sidebarGroup.Position = UDim2.fromOffset(0, 115)
 			sidebarGroup.Size = UDim2.new(1, 0, 1, -115)
-			titleFrame.Size = UDim2.new(1, 0, 0, 42)
+			titleFrame.Size = UDim2.new(1, -headerIconOffset, 0, 42)
+			headerIcon.Position = UDim2.fromOffset(0, 21)
 			tagRail.Position = UDim2.fromOffset(0, 44)
 			tagRail.Size = UDim2.fromOffset(math.min(86, math.max(64, contentWidth - 21)), 24)
 		else
 			information.Size = UDim2.new(1, 0, 0, 60)
 			sidebarGroup.Position = UDim2.fromOffset(0, 91)
 			sidebarGroup.Size = UDim2.new(1, 0, 1, -91)
-			titleFrame.Size = UDim2.fromScale(1, 1)
+			titleFrame.Size = UDim2.new(1, -headerIconOffset, 1, 0)
+			headerIcon.Position = UDim2.new(0, 0, 0.5, 0)
 			local width = math.clamp(contentWidth - wantedX - 21, 62, 84)
 			tagRail.Position = UDim2.fromOffset(wantedX, 2)
 			tagRail.Size = UDim2.fromOffset(width + 2, 24)
@@ -923,6 +945,80 @@ function MacLib:Window(Settings)
 
 	for _, tagSettings in ipairs(Settings.Tags or {}) do
 		WindowFunctions:Tag(tagSettings)
+	end
+
+	-- Optional floating mascot. Kept as a compatibility API for examples and
+	-- older hub setups; it is never created unless AddMascot is called.
+	function WindowFunctions:AddMascot(MascotSettings)
+		MascotSettings = MascotSettings or {}
+		local MascotFunctions = {}
+		local mascot = Instance.new("ImageButton")
+		mascot.Name = "MacLibMascot"
+		mascot.AutoButtonColor = false
+		mascot.BackgroundTransparency = 1
+		mascot.AnchorPoint = Vector2.new(0.5, 0.5)
+		mascot.Position = MascotSettings.Position or UDim2.new(1, -72, 1, -84)
+		local size = tonumber(MascotSettings.Size) or 58
+		mascot.Size = UDim2.fromOffset(size, size)
+		mascot.ScaleType = Enum.ScaleType.Fit
+		mascot.ZIndex = 245
+		mascot.Parent = macLib
+		MacLib:ApplyIcon(mascot, MascotSettings.Image or MascotSettings.Icon or "sparkles", MascotSettings.Color or Color3.fromRGB(255, 255, 255))
+
+		local scale = Instance.new("UIScale")
+		scale.Parent = mascot
+		local basePosition = mascot.Position
+		local bob = Tween(mascot, TweenInfo.new(1.35, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+			Position = basePosition + UDim2.fromOffset(0, -7),
+		})
+		if MascotSettings.Bobbing ~= false then bob:Play() end
+
+		mascot.MouseEnter:Connect(function()
+			Tween(scale, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1.08 }):Play()
+		end)
+		mascot.MouseLeave:Connect(function()
+			Tween(scale, TweenInfo.new(0.15, Enum.EasingStyle.Sine), { Scale = 1 }):Play()
+		end)
+		mascot.MouseButton1Click:Connect(function()
+			playUISound("Click", 1.12, 0.17, 0.04)
+			if MascotSettings.Callback then task.spawn(MascotSettings.Callback, MascotFunctions) end
+		end)
+
+		local draggingMascot, dragStart, startPosition
+		mascot.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				draggingMascot = true
+				dragStart = input.Position
+				startPosition = mascot.Position
+			end
+		end)
+		mascot.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				draggingMascot = false
+			end
+		end)
+		UserInputService.InputChanged:Connect(function(input)
+			if draggingMascot and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				local delta = input.Position - dragStart
+				mascot.Position = startPosition + UDim2.fromOffset(delta.X, delta.Y)
+			end
+		end)
+
+		function MascotFunctions:SetImage(value, color)
+			return MacLib:ApplyIcon(mascot, value, color or Color3.fromRGB(255, 255, 255))
+		end
+		function MascotFunctions:SetVisible(value) mascot.Visible = value == true end
+		function MascotFunctions:SetPosition(value)
+			bob:Cancel()
+			mascot.Position = value
+			basePosition = value
+		end
+		function MascotFunctions:Destroy()
+			bob:Cancel()
+			mascot:Destroy()
+		end
+		MascotFunctions.Instance = mascot
+		return MascotFunctions
 	end
 
 	local userInfoUIPadding = Instance.new("UIPadding")
@@ -7511,13 +7607,13 @@ function MacLib:Window(Settings)
 			launcher.ZIndex = 252
 			launcher.Parent = motion
 			local launcherCorner = Instance.new("UICorner")
-			launcherCorner.CornerRadius = UDim.new(1, 0)
+			launcherCorner.CornerRadius = UDim.new(0, 8)
 			launcherCorner.Parent = launcher
 			local launcherStroke = Instance.new("UIStroke")
 			launcherStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-			launcherStroke.Color = openColor
-			launcherStroke.Transparency = 0.48
-			launcherStroke.Thickness = 1
+			launcherStroke.Color = Color3.fromRGB(92, 98, 108)
+			launcherStroke.Transparency = 0.62
+			launcherStroke.Thickness = 0.8
 			launcherStroke.Parent = launcher
 
 			local chart = Instance.new("Frame")
@@ -7693,7 +7789,7 @@ function MacLib:Window(Settings)
 					Tween(openButtonContainer, TweenInfo.new(.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size=openButtonSize}):Play()
 				end
 				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0 }):Play()
-				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.18 }):Play()
+				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.34 }):Play()
 				Tween(glow, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.79 }):Play()
 			end)
 			launcher.MouseLeave:Connect(function()
@@ -7707,7 +7803,7 @@ function MacLib:Window(Settings)
 					collapse:Play()
 				end
 				Tween(launcher, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.08 }):Play()
-				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.48 }):Play()
+				Tween(launcherStroke, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { Transparency = 0.62 }):Play()
 				Tween(glow, TweenInfo.new(0.16, Enum.EasingStyle.Sine), { BackgroundTransparency = 0.88 }):Play()
 			end)
 
